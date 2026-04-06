@@ -72,6 +72,7 @@ export default function TodayScreen({ navigation }: any) {
           restSeconds: pe.restSeconds,
           notes: '',
           completed: false,
+          supersetGroup: pe.supersetGroup,
         };
       }),
       prs: [],

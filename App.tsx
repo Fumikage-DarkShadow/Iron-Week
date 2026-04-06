@@ -5,8 +5,10 @@ import { useFonts, BebasNeue_400Regular } from '@expo-google-fonts/bebas-neue';
 import { DMSans_400Regular, DMSans_500Medium, DMSans_700Bold } from '@expo-google-fonts/dm-sans';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import Navigation from './src/navigation';
+import OnboardingScreen from './src/screens/onboarding/OnboardingScreen';
 import { colors, fonts } from './src/theme';
 import { useSyncStore } from './src/stores/syncStore';
+import { useSettingsStore } from './src/stores/settingsStore';
 
 export default function App() {
   const [fontsLoaded] = useFonts({
@@ -17,6 +19,7 @@ export default function App() {
   });
 
   const { pull } = useSyncStore();
+  const { settings } = useSettingsStore();
 
   useEffect(() => {
     // Pull data from GitHub on startup
@@ -30,6 +33,15 @@ export default function App() {
         <Text style={styles.loadingText}>IRON WEEK PRO</Text>
         <StatusBar style="light" />
       </View>
+    );
+  }
+
+  if (!settings.hasOnboarded) {
+    return (
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <OnboardingScreen />
+        <StatusBar style="light" />
+      </GestureHandlerRootView>
     );
   }
 

@@ -5,14 +5,16 @@ import { useSessionStore } from '../../stores/sessionStore';
 import { useSettingsStore } from '../../stores/settingsStore';
 import { getExerciseById } from '../../data/exercises';
 import { estimate1RM, generateRecommendation } from '../../utils/coachEngine';
-import { getSetAdvice, SetAdvice } from '../../utils/setAdvisor';
+import { getSetAdvice } from '../../utils/setAdvisor';
 import SetRow from '../../components/SetRow';
 import RestTimer from '../../components/RestTimer';
 import CoachCard from '../../components/CoachCard';
 import { WorkoutSet } from '../../types';
+import type { ExerciseType } from '../../types';
+import { generateWarmupSets } from '../../utils/warmupGenerator';
 
 export default function ActiveWorkoutScreen({ navigation }: any) {
-  const { activeSession, updateSet, completeExercise, addSet, removeSet, addNote, endSession, sessions } = useSessionStore();
+  const { activeSession, updateSet, updateExercise, completeExercise, addSet, removeSet, addNote, endSession, sessions } = useSessionStore();
   const { settings } = useSettingsStore();
   const [currentExIndex, setCurrentExIndex] = useState(0);
   const [showTimer, setShowTimer] = useState(false);
@@ -36,6 +38,17 @@ export default function ActiveWorkoutScreen({ navigation }: any) {
       </View>
     );
   }
+
+  // Superset helpers
+  const supersetGroup = currentExercise.supersetGroup;
+  const supersetExercises = supersetGroup != null
+    ? activeSession.exercises
+        .map((ex, idx) => ({ ex, idx }))
+        .filter((item) => item.ex.supersetGroup === supersetGroup)
+    : [];
+  const supersetPosition = supersetExercises.findIndex((item) => item.idx === currentExIndex);
+  const isInSuperset = supersetExercises.length > 1;
+  const isLastInSuperset = isInSuperset && supersetPosition === supersetExercises.length - 1;
 
   // Previous session sets for comparison
   const previousSets = useMemo(() => {
@@ -131,7 +144,22 @@ export default function ActiveWorkoutScreen({ navigation }: any) {
         }
       }
 
-      setShowTimer(true);
+      // Superset logic: check if all sets are done after this one
+      const allDoneAfter = currentExercise.sets.every((s, i) =>
+        i === setIndex ? true : s.done
+      );
+
+      if (allDoneAfter && isInSuperset && !isLastInSuperset) {
+        // Auto-advance to next exercise in superset WITHOUT rest timer
+        completeExercise(currentExIndex);
+        const nextInSuperset = supersetExercises[supersetPosition + 1];
+        if (nextInSuperset) {
+          setCurrentExIndex(nextInSuperset.idx);
+        }
+      } else {
+        // Normal: show rest timer (including last-in-superset case)
+        setShowTimer(true);
+      }
     } else if (set.done) {
       updateSet(currentExIndex, setIndex, { done: false });
     }
@@ -214,6 +242,15 @@ export default function ActiveWorkoutScreen({ navigation }: any) {
           />
         </View>
 
+        {/* Superset badge */}
+        {isInSuperset && (
+          <View style={supersetStyles.supersetBadge}>
+            <Text style={supersetStyles.supersetBadgeText}>
+              Superset {supersetPosition + 1}/{supersetExercises.length}
+            </Text>
+          </View>
+        )}
+
         {/* Exercise info */}
         <View style={styles.exerciseHeader}>
           <Text style={styles.exerciseName}>{exerciseInfo?.nameFr}</Text>
@@ -230,6 +267,40 @@ export default function ActiveWorkoutScreen({ navigation }: any) {
         {previousSets.length > 0 && (
           <TouchableOpacity style={styles.loadPrevBtn} onPress={loadPreviousWeights}>
             <Text style={styles.loadPrevText}>📋 Reprendre les charges</Text>
+          </TouchableOpacity>
+        )}
+
+        {/* Auto warmup button */}
+        {!currentExercise.sets.some((s) => s.isWarmup) && (
+          <TouchableOpacity
+            style={styles.warmupBtn}
+            onPress={() => {
+              const firstSetKg = currentExercise.sets[0]?.kg || 0;
+              if (firstSetKg <= 0) {
+                Alert.alert('Charge manquante', 'Renseigne d\'abord le poids de ta première série.');
+                return;
+              }
+              const exType: ExerciseType = exerciseInfo?.type || 'compound';
+              const isCompound = exType === 'compound';
+              const warmups = generateWarmupSets(
+                firstSetKg,
+                currentExercise.targetRepsRange[0],
+                isCompound
+              );
+              // Prepend warmup sets before working sets
+              const warmupSets: WorkoutSet[] = warmups.map((w, i) => ({
+                id: `warmup_${Date.now()}_${i}`,
+                kg: w.kg,
+                reps: w.reps,
+                done: false,
+                isWarmup: true,
+              }));
+              updateExercise(currentExIndex, {
+                sets: [...warmupSets, ...currentExercise.sets],
+              });
+            }}
+          >
+            <Text style={styles.warmupBtnText}>🔥 Échauffement auto</Text>
           </TouchableOpacity>
         )}
 
@@ -305,6 +376,24 @@ export default function ActiveWorkoutScreen({ navigation }: any) {
   );
 }
 
+const supersetStyles = StyleSheet.create({
+  supersetBadge: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.purple + '20',
+    borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.purple + '50',
+  },
+  supersetBadgeText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.sm,
+    color: colors.purple,
+  },
+});
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   scroll: { flex: 1 },
@@ -355,6 +444,20 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyMedium,
     fontSize: fontSize.sm,
     color: colors.blue,
+  },
+  warmupBtn: {
+    backgroundColor: colors.accent2 + '18',
+    borderRadius: borderRadius.sm,
+    padding: spacing.md,
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.accent2 + '40',
+  },
+  warmupBtnText: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: fontSize.sm,
+    color: colors.accent2,
   },
   setsContainer: { marginBottom: spacing.lg },
   setsHeader: {

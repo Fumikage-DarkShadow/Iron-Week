@@ -47,6 +47,7 @@ export interface WorkoutExercise {
   restSeconds: number;
   notes: string;
   completed: boolean;
+  supersetGroup?: number;
 }
 
 export interface Program {
@@ -64,6 +65,7 @@ export interface ProgramExercise {
   targetSets: number;
   targetRepsRange: [number, number];
   restSeconds: number;
+  supersetGroup?: number;
 }
 
 export interface Session {
@@ -140,6 +142,7 @@ export interface UserSettings {
   notificationsEnabled: boolean;
   soundEnabled: boolean;
   hapticEnabled: boolean;
+  hasOnboarded: boolean;
 }
 
 export type SyncStatus = 'idle' | 'syncing' | 'success' | 'error' | 'offline';

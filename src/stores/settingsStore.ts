@@ -19,6 +19,7 @@ const defaultSettings: UserSettings = {
   notificationsEnabled: true,
   soundEnabled: true,
   hapticEnabled: true,
+  hasOnboarded: false,
 };
 
 export const useSettingsStore = create<SettingsStore>()(

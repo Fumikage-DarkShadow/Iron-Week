@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-native';
+import { CartesianChart, Line, Bar } from 'victory-native';
 import { colors, fonts, borderRadius, spacing, fontSize } from '../../theme';
 import { useSessionStore } from '../../stores/sessionStore';
 import { getExerciseById } from '../../data/exercises';
@@ -31,26 +32,33 @@ export default function ExerciseStatsScreen({ route }: any) {
   }, [sessions, exerciseId, period]);
 
   const chartData = useMemo(() => {
-    return filteredSessions.map((session) => {
+    return filteredSessions.map((session, i) => {
       const ex = session.exercises.find((e) => e.exerciseId === exerciseId);
-      if (!ex) return { date: session.date, maxWeight: 0, estimated1RM: 0, volume: 0 };
+      if (!ex) return { idx: i, date: session.date, maxWeight: 0, estimated1RM: 0, volume: 0 };
 
       const doneSets = ex.sets.filter((s) => s.done);
       const maxWeight = Math.max(0, ...doneSets.map((s) => s.kg));
       const estimated = Math.max(0, ...doneSets.map((s) => estimate1RM(s.kg, s.reps)));
       const volume = doneSets.reduce((v, s) => v + s.kg * s.reps, 0);
 
-      return { date: session.date, maxWeight, estimated1RM: estimated, volume };
+      return { idx: i, date: session.date, maxWeight, estimated1RM: estimated, volume };
     });
   }, [filteredSessions, exerciseId]);
-
-  const maxWeight = Math.max(1, ...chartData.map((d) => d.maxWeight));
-  const max1RM = Math.max(1, ...chartData.map((d) => d.estimated1RM));
-  const maxVolume = Math.max(1, ...chartData.map((d) => d.volume));
 
   const currentMax = chartData.length > 0 ? chartData[chartData.length - 1].maxWeight : 0;
   const current1RM = chartData.length > 0 ? chartData[chartData.length - 1].estimated1RM : 0;
   const bestEver1RM = Math.max(0, ...chartData.map((d) => d.estimated1RM));
+
+  const formatXLabel = (value: number) => {
+    const idx = Math.round(value);
+    if (idx >= 0 && idx < chartData.length) {
+      return chartData[idx].date.split('-').slice(1).join('/');
+    }
+    return '';
+  };
+
+  const CHART_HEIGHT = 200;
+  const CHART_PADDING = { left: 45, right: 16, top: 16, bottom: 32 };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -79,7 +87,7 @@ export default function ExerciseStatsScreen({ route }: any) {
         </View>
         <View style={styles.summaryCard}>
           <Text style={[styles.summaryValue, { color: colors.blue }]}>{Math.round(current1RM)}kg</Text>
-          <Text style={styles.summaryLabel}>1RM estimé</Text>
+          <Text style={styles.summaryLabel}>1RM estime</Text>
         </View>
         <View style={styles.summaryCard}>
           <Text style={[styles.summaryValue, { color: colors.gold }]}>{Math.round(bestEver1RM)}kg</Text>
@@ -89,79 +97,107 @@ export default function ExerciseStatsScreen({ route }: any) {
 
       {chartData.length === 0 ? (
         <View style={styles.noData}>
-          <Text style={styles.noDataText}>Pas encore de données pour cette période</Text>
+          <Text style={styles.noDataText}>Pas encore de donnees pour cette periode</Text>
         </View>
       ) : (
         <>
-          {/* Max Weight Chart (text-based bar chart) */}
+          {/* Max Weight Chart - VictoryLine */}
           <View style={styles.chartSection}>
-            <Text style={styles.chartTitle}>Charge max par séance</Text>
-            <View style={styles.chart}>
-              {chartData.map((d, i) => (
-                <View key={i} style={styles.chartBar}>
-                  <Text style={styles.chartBarValue}>{d.maxWeight}</Text>
-                  <View
-                    style={[
-                      styles.chartBarFill,
-                      {
-                        height: Math.max(4, (d.maxWeight / maxWeight) * 100),
-                        backgroundColor: colors.accent,
-                      },
-                    ]}
+            <Text style={styles.chartTitle}>Charge max par seance</Text>
+            <View style={[styles.chartContainer, { height: CHART_HEIGHT }]}>
+              <CartesianChart
+                data={chartData}
+                xKey="idx"
+                yKeys={["maxWeight"]}
+                padding={CHART_PADDING}
+                domainPadding={{ top: 20, bottom: 10 }}
+                axisOptions={{
+                  font: null,
+                  tickCount: { x: Math.min(chartData.length, 6), y: 5 },
+                  lineColor: colors.border,
+                  labelColor: colors.muted,
+                  formatXLabel,
+                  formatYLabel: (v) => `${Math.round(v as number)}`,
+                }}
+              >
+                {({ points }) => (
+                  <Line
+                    points={points.maxWeight}
+                    color={colors.accent}
+                    strokeWidth={2.5}
+                    curveType="natural"
                   />
-                  <Text style={styles.chartBarDate}>
-                    {d.date.split('-').slice(1).join('/')}
-                  </Text>
-                </View>
-              ))}
+                )}
+              </CartesianChart>
             </View>
           </View>
 
-          {/* 1RM Chart */}
+          {/* 1RM Chart - VictoryLine */}
           <View style={styles.chartSection}>
-            <Text style={styles.chartTitle}>1RM estimé (Epley)</Text>
-            <View style={styles.chart}>
-              {chartData.map((d, i) => (
-                <View key={i} style={styles.chartBar}>
-                  <Text style={styles.chartBarValue}>{Math.round(d.estimated1RM)}</Text>
-                  <View
-                    style={[
-                      styles.chartBarFill,
-                      {
-                        height: Math.max(4, (d.estimated1RM / max1RM) * 100),
-                        backgroundColor: colors.blue,
-                      },
-                    ]}
+            <Text style={styles.chartTitle}>1RM estime (Epley)</Text>
+            <View style={[styles.chartContainer, { height: CHART_HEIGHT }]}>
+              <CartesianChart
+                data={chartData}
+                xKey="idx"
+                yKeys={["estimated1RM"]}
+                padding={CHART_PADDING}
+                domainPadding={{ top: 20, bottom: 10 }}
+                axisOptions={{
+                  font: null,
+                  tickCount: { x: Math.min(chartData.length, 6), y: 5 },
+                  lineColor: colors.border,
+                  labelColor: colors.muted,
+                  formatXLabel,
+                  formatYLabel: (v) => `${Math.round(v as number)}`,
+                }}
+              >
+                {({ points }) => (
+                  <Line
+                    points={points.estimated1RM}
+                    color={colors.blue}
+                    strokeWidth={2.5}
+                    curveType="natural"
                   />
-                </View>
-              ))}
+                )}
+              </CartesianChart>
             </View>
           </View>
 
-          {/* Volume Chart */}
+          {/* Volume Chart - VictoryBar */}
           <View style={styles.chartSection}>
             <Text style={styles.chartTitle}>Volume total (kg)</Text>
-            <View style={styles.chart}>
-              {chartData.map((d, i) => (
-                <View key={i} style={styles.chartBar}>
-                  <Text style={styles.chartBarValue}>{Math.round(d.volume)}</Text>
-                  <View
-                    style={[
-                      styles.chartBarFill,
-                      {
-                        height: Math.max(4, (d.volume / maxVolume) * 100),
-                        backgroundColor: colors.green,
-                      },
-                    ]}
+            <View style={[styles.chartContainer, { height: CHART_HEIGHT }]}>
+              <CartesianChart
+                data={chartData}
+                xKey="idx"
+                yKeys={["volume"]}
+                padding={CHART_PADDING}
+                domainPadding={{ top: 20, bottom: 10 }}
+                axisOptions={{
+                  font: null,
+                  tickCount: { x: Math.min(chartData.length, 6), y: 5 },
+                  lineColor: colors.border,
+                  labelColor: colors.muted,
+                  formatXLabel,
+                  formatYLabel: (v) => `${Math.round(v as number)}`,
+                }}
+              >
+                {({ points, chartBounds }) => (
+                  <Bar
+                    points={points.volume}
+                    chartBounds={chartBounds}
+                    color={colors.green}
+                    roundedCorners={{ topLeft: 4, topRight: 4 }}
+                    innerPadding={0.3}
                   />
-                </View>
-              ))}
+                )}
+              </CartesianChart>
             </View>
           </View>
 
           {/* History table */}
           <View style={styles.historySection}>
-            <Text style={styles.chartTitle}>Historique détaillé</Text>
+            <Text style={styles.chartTitle}>Historique detaille</Text>
             {[...filteredSessions].reverse().map((session, i) => {
               const ex = session.exercises.find((e) => e.exerciseId === exerciseId);
               if (!ex) return null;
@@ -172,7 +208,7 @@ export default function ExerciseStatsScreen({ route }: any) {
                     {ex.sets.filter((s) => s.done).map((s, j) => (
                       <View key={j} style={styles.historySet}>
                         <Text style={styles.historySetText}>
-                          {s.kg}kg × {s.reps}
+                          {s.kg}kg x {s.reps}
                         </Text>
                       </View>
                     ))}
@@ -264,38 +300,12 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     letterSpacing: 1,
   },
-  chart: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-around',
-    height: 140,
+  chartContainer: {
     backgroundColor: colors.card,
     borderRadius: borderRadius.md,
-    padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
-  },
-  chartBar: {
-    alignItems: 'center',
-    flex: 1,
-    maxWidth: 40,
-  },
-  chartBarValue: {
-    fontFamily: fonts.body,
-    fontSize: 9,
-    color: colors.muted,
-    marginBottom: 2,
-  },
-  chartBarFill: {
-    width: 16,
-    borderRadius: 4,
-    minHeight: 4,
-  },
-  chartBarDate: {
-    fontFamily: fonts.body,
-    fontSize: 8,
-    color: colors.muted,
-    marginTop: 2,
+    overflow: 'hidden',
   },
   historySection: { marginBottom: spacing.xl },
   historyRow: {

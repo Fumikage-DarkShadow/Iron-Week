@@ -8,6 +8,8 @@ import { UserGoal, UserLevel, WeightUnit } from '../../types';
 import { useWorkoutStore } from '../../stores/workoutStore';
 import { useSessionStore } from '../../stores/sessionStore';
 import { seedPrograms } from '../../data/seedPrograms';
+import { scheduleWorkoutReminder, cancelAllReminders } from '../../utils/notifications';
+import { shareCSV } from '../../utils/csvExport';
 
 const goalLabels: Record<UserGoal, string> = {
   masse: 'Prise de masse',
@@ -27,6 +29,8 @@ export default function SettingsScreen({ navigation }: any) {
   const { status: syncStatus, sync } = useSyncStore();
   const [token, setToken] = useState(settings.githubToken ? '***' : '');
   const [repo, setRepo] = useState(settings.githubRepo);
+  const [reminderHour, setReminderHour] = useState<number | null>(null);
+  const { sessions } = useSessionStore();
 
   const handleSaveGithub = async () => {
     if (token && token !== '***') {
@@ -160,6 +164,42 @@ export default function SettingsScreen({ navigation }: any) {
             thumbColor={settings.hapticEnabled ? colors.accent : colors.muted}
           />
         </View>
+
+        {/* Rappel séance */}
+        <View style={{ marginTop: spacing.md }}>
+          <Text style={styles.switchLabel}>Rappel séance</Text>
+          <View style={[styles.toggleRow, { marginTop: spacing.sm }]}>
+            {[7, 8, 9, 10].map((hour) => (
+              <TouchableOpacity
+                key={hour}
+                style={[styles.toggleBtn, reminderHour === hour && styles.toggleBtnActive]}
+                onPress={async () => {
+                  setReminderHour(hour);
+                  await scheduleWorkoutReminder(hour, 0);
+                  Alert.alert('Rappel activé', `Tu seras notifié chaque jour à ${hour}h00.`);
+                }}
+              >
+                <Text style={[styles.toggleText, reminderHour === hour && styles.toggleTextActive]}>
+                  {hour}h
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {reminderHour !== null && (
+            <TouchableOpacity
+              style={{ marginTop: spacing.sm, alignItems: 'center' }}
+              onPress={async () => {
+                await cancelAllReminders();
+                setReminderHour(null);
+                Alert.alert('Rappel désactivé', 'Plus de notifications de rappel.');
+              }}
+            >
+              <Text style={{ fontFamily: fonts.body, fontSize: fontSize.sm, color: colors.red }}>
+                Désactiver le rappel
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* GitHub Sync */}
@@ -233,6 +273,23 @@ export default function SettingsScreen({ navigation }: any) {
           <View style={styles.dataBtnContent}>
             <Text style={styles.dataBtnTitle}>Importer mes programmes</Text>
             <Text style={styles.dataBtnSub}>Charge les 6 programmes prédéfinis</Text>
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.dataBtn}
+          onPress={async () => {
+            if (sessions.length === 0) {
+              Alert.alert('Aucune donnée', 'Tu n\'as pas encore de séances à exporter.');
+              return;
+            }
+            await shareCSV(sessions);
+          }}
+        >
+          <Text style={styles.dataBtnIcon}>📤</Text>
+          <View style={styles.dataBtnContent}>
+            <Text style={styles.dataBtnTitle}>Exporter mes données</Text>
+            <Text style={styles.dataBtnSub}>Exporter toutes les séances en CSV</Text>
           </View>
         </TouchableOpacity>
 

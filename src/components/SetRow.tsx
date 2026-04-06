@@ -85,6 +85,54 @@ export default function SetRow({
         </TouchableOpacity>
       </View>
 
+      {/* RPE selector — shown after set is marked done */}
+      {set.done && (
+        <View style={styles.rpeRow}>
+          <Text style={styles.rpeLabel}>RPE</Text>
+          {([6, 7, 8, 9, 10] as const).map((val) => {
+            const rpeColors: Record<number, string> = {
+              6: colors.green,
+              7: '#84cc16',
+              8: colors.gold,
+              9: colors.accent2,
+              10: colors.red,
+            };
+            const rpeLabels: Record<number, string> = { 6: 'Easy', 10: 'Max' };
+            const isSelected = set.rpe === val;
+            return (
+              <TouchableOpacity
+                key={val}
+                style={[
+                  styles.rpeBtn,
+                  { borderColor: rpeColors[val] + '60' },
+                  isSelected && { backgroundColor: rpeColors[val], borderColor: rpeColors[val] },
+                ]}
+                onPress={() => onUpdate({ rpe: val })}
+              >
+                <Text
+                  style={[
+                    styles.rpeBtnText,
+                    { color: isSelected ? colors.white : rpeColors[val] },
+                  ]}
+                >
+                  {val}
+                </Text>
+                {rpeLabels[val] && (
+                  <Text
+                    style={[
+                      styles.rpeBtnSub,
+                      { color: isSelected ? colors.white : rpeColors[val] },
+                    ]}
+                  >
+                    {rpeLabels[val]}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
+
       {/* Per-set coach advice (shown below the set row) */}
       {advice && !set.done && (
         <View style={styles.adviceRow}>
@@ -205,6 +253,36 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: fontSize.md,
     color: colors.white,
+  },
+  rpeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 2,
+    marginLeft: 30 + spacing.sm,
+    gap: spacing.xs,
+  },
+  rpeLabel: {
+    fontFamily: fonts.body,
+    fontSize: 10,
+    color: colors.muted,
+    marginRight: spacing.xs,
+  },
+  rpeBtn: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    alignItems: 'center',
+    minWidth: 32,
+  },
+  rpeBtnText: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 11,
+  },
+  rpeBtnSub: {
+    fontFamily: fonts.body,
+    fontSize: 7,
+    marginTop: -1,
   },
   adviceRow: {
     backgroundColor: colors.blue + '10',

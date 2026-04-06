@@ -34,7 +34,7 @@ export default function CreateProgramScreen({ navigation, route }: any) {
 
   const save = () => {
     if (!name.trim()) {
-      Alert.alert('Erreur', 'Donne un nom à ton programme');
+      Alert.alert('Erreur', 'Donne un nom a ton programme');
       return;
     }
     if (exercises.length === 0) {
@@ -60,7 +60,21 @@ export default function CreateProgramScreen({ navigation, route }: any) {
   };
 
   const removeExercise = useCallback((index: number) => {
-    setExercises((prev) => prev.filter((_, i) => i !== index));
+    setExercises((prev) => {
+      const removed = prev[index];
+      const updated = prev.filter((_, i) => i !== index);
+      // If removed exercise was in a superset group, check if partner is now alone
+      if (removed.supersetGroup != null) {
+        const remaining = updated.filter((e) => e.supersetGroup === removed.supersetGroup);
+        if (remaining.length === 1) {
+          // Remove supersetGroup from the lone exercise
+          return updated.map((e) =>
+            e.supersetGroup === removed.supersetGroup ? { ...e, supersetGroup: undefined } : e
+          );
+        }
+      }
+      return updated;
+    });
   }, []);
 
   const updateExerciseConfig = useCallback((index: number, updates: Partial<ProgramExercise>) => {
@@ -79,95 +93,176 @@ export default function CreateProgramScreen({ navigation, route }: any) {
     });
   }, []);
 
+  const toggleSuperset = useCallback((indexA: number, indexB: number) => {
+    setExercises((prev) => {
+      const a = prev[indexA];
+      const b = prev[indexB];
+
+      // If both already share the same superset group, unlink them
+      if (a.supersetGroup != null && a.supersetGroup === b.supersetGroup) {
+        return prev.map((ex, i) => {
+          if (i === indexA || i === indexB) {
+            return { ...ex, supersetGroup: undefined };
+          }
+          return ex;
+        });
+      }
+
+      // Assign a new group (or reuse existing group from one of them)
+      const groupId = a.supersetGroup ?? b.supersetGroup ?? Date.now();
+      return prev.map((ex, i) => {
+        if (i === indexA || i === indexB) {
+          return { ...ex, supersetGroup: groupId };
+        }
+        // If the other exercise was in a different group, merge
+        if (a.supersetGroup != null && ex.supersetGroup === a.supersetGroup) {
+          return { ...ex, supersetGroup: groupId };
+        }
+        if (b.supersetGroup != null && ex.supersetGroup === b.supersetGroup) {
+          return { ...ex, supersetGroup: groupId };
+        }
+        return ex;
+      });
+    });
+  }, []);
+
+  // Check if two adjacent exercises are in the same superset group
+  const areInSameSuperset = (indexA: number, indexB: number): boolean => {
+    if (indexA < 0 || indexB >= exercises.length) return false;
+    const a = exercises[indexA];
+    const b = exercises[indexB];
+    return a.supersetGroup != null && a.supersetGroup === b.supersetGroup;
+  };
+
   const renderExercise = useCallback(({ item, index }: { item: ProgramExercise; index: number }) => {
     const info = getExerciseById(item.exerciseId);
+    const isInSuperset = item.supersetGroup != null;
+    const isFirstInGroup = isInSuperset && (index === 0 || exercises[index - 1]?.supersetGroup !== item.supersetGroup);
+    const isLastInGroup = isInSuperset && (index === exercises.length - 1 || exercises[index + 1]?.supersetGroup !== item.supersetGroup);
+    const showSupersetLink = index < exercises.length - 1;
+    const linkedWithNext = areInSameSuperset(index, index + 1);
+
     return (
-      <View style={styles.exerciseRow}>
-        <View style={styles.reorderBtns}>
-          <TouchableOpacity onPress={() => moveExercise(index, index - 1)}>
-            <Text style={styles.reorderText}>▲</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => moveExercise(index, index + 1)}>
-            <Text style={styles.reorderText}>▼</Text>
-          </TouchableOpacity>
-        </View>
-        <View style={styles.exerciseContent}>
-          <View style={styles.exerciseHeader}>
-            <Text style={styles.exerciseName}>{info?.nameFr || item.exerciseId}</Text>
-            <TouchableOpacity onPress={() => removeExercise(index)}>
-              <Text style={styles.removeText}>✕</Text>
+      <View>
+        {/* Superset bracket on the left */}
+        <View style={[styles.exerciseRow, isInSuperset && styles.exerciseRowSuperset]}>
+          {isInSuperset && (
+            <View style={styles.supersetBracket}>
+              {isFirstInGroup && (
+                <Text style={styles.supersetLabel}>SS</Text>
+              )}
+              <View style={[
+                styles.bracketLine,
+                isFirstInGroup && styles.bracketLineTop,
+                isLastInGroup && styles.bracketLineBottom,
+                !isFirstInGroup && !isLastInGroup && styles.bracketLineMiddle,
+              ]} />
+            </View>
+          )}
+          <View style={styles.reorderBtns}>
+            <TouchableOpacity onPress={() => moveExercise(index, index - 1)}>
+              <Text style={styles.reorderText}>▲</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => moveExercise(index, index + 1)}>
+              <Text style={styles.reorderText}>▼</Text>
             </TouchableOpacity>
           </View>
-          <View style={styles.configRow}>
-            <View style={styles.configItem}>
-              <Text style={styles.configLabel}>Séries</Text>
-              <View style={styles.stepper}>
-                <TouchableOpacity
-                  onPress={() => updateExerciseConfig(index, { targetSets: Math.max(1, item.targetSets - 1) })}
-                >
-                  <Text style={styles.stepperBtn}>−</Text>
-                </TouchableOpacity>
-                <Text style={styles.stepperValue}>{item.targetSets}</Text>
-                <TouchableOpacity
-                  onPress={() => updateExerciseConfig(index, { targetSets: item.targetSets + 1 })}
-                >
-                  <Text style={styles.stepperBtn}>+</Text>
-                </TouchableOpacity>
-              </View>
+          <View style={styles.exerciseContent}>
+            <View style={styles.exerciseHeader}>
+              <Text style={styles.exerciseName}>{info?.nameFr || item.exerciseId}</Text>
+              <TouchableOpacity onPress={() => removeExercise(index)}>
+                <Text style={styles.removeText}>✕</Text>
+              </TouchableOpacity>
             </View>
-            <View style={styles.configItem}>
-              <Text style={styles.configLabel}>Min reps</Text>
-              <View style={styles.stepper}>
-                <TouchableOpacity
-                  onPress={() => updateExerciseConfig(index, { targetRepsRange: [Math.max(1, item.targetRepsRange[0] - 1), item.targetRepsRange[1]] })}
-                >
-                  <Text style={styles.stepperBtn}>−</Text>
-                </TouchableOpacity>
-                <Text style={styles.stepperValue}>{item.targetRepsRange[0]}</Text>
-                <TouchableOpacity
-                  onPress={() => updateExerciseConfig(index, { targetRepsRange: [Math.min(item.targetRepsRange[0] + 1, item.targetRepsRange[1]), item.targetRepsRange[1]] })}
-                >
-                  <Text style={styles.stepperBtn}>+</Text>
-                </TouchableOpacity>
+            <View style={styles.configRow}>
+              <View style={styles.configItem}>
+                <Text style={styles.configLabel}>Series</Text>
+                <View style={styles.stepper}>
+                  <TouchableOpacity
+                    onPress={() => updateExerciseConfig(index, { targetSets: Math.max(1, item.targetSets - 1) })}
+                  >
+                    <Text style={styles.stepperBtn}>-</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.stepperValue}>{item.targetSets}</Text>
+                  <TouchableOpacity
+                    onPress={() => updateExerciseConfig(index, { targetSets: item.targetSets + 1 })}
+                  >
+                    <Text style={styles.stepperBtn}>+</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
-            <View style={styles.configItem}>
-              <Text style={styles.configLabel}>Max reps</Text>
-              <View style={styles.stepper}>
-                <TouchableOpacity
-                  onPress={() => updateExerciseConfig(index, { targetRepsRange: [item.targetRepsRange[0], Math.max(item.targetRepsRange[0], item.targetRepsRange[1] - 1)] })}
-                >
-                  <Text style={styles.stepperBtn}>−</Text>
-                </TouchableOpacity>
-                <Text style={styles.stepperValue}>{item.targetRepsRange[1]}</Text>
-                <TouchableOpacity
-                  onPress={() => updateExerciseConfig(index, { targetRepsRange: [item.targetRepsRange[0], item.targetRepsRange[1] + 1] })}
-                >
-                  <Text style={styles.stepperBtn}>+</Text>
-                </TouchableOpacity>
+              <View style={styles.configItem}>
+                <Text style={styles.configLabel}>Min reps</Text>
+                <View style={styles.stepper}>
+                  <TouchableOpacity
+                    onPress={() => updateExerciseConfig(index, { targetRepsRange: [Math.max(1, item.targetRepsRange[0] - 1), item.targetRepsRange[1]] })}
+                  >
+                    <Text style={styles.stepperBtn}>-</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.stepperValue}>{item.targetRepsRange[0]}</Text>
+                  <TouchableOpacity
+                    onPress={() => updateExerciseConfig(index, { targetRepsRange: [Math.min(item.targetRepsRange[0] + 1, item.targetRepsRange[1]), item.targetRepsRange[1]] })}
+                  >
+                    <Text style={styles.stepperBtn}>+</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
-            <View style={styles.configItem}>
-              <Text style={styles.configLabel}>Repos</Text>
-              <View style={styles.stepper}>
-                <TouchableOpacity
-                  onPress={() => updateExerciseConfig(index, { restSeconds: Math.max(15, item.restSeconds - 15) })}
-                >
-                  <Text style={styles.stepperBtn}>−</Text>
-                </TouchableOpacity>
-                <Text style={styles.stepperValue}>{item.restSeconds}s</Text>
-                <TouchableOpacity
-                  onPress={() => updateExerciseConfig(index, { restSeconds: item.restSeconds + 15 })}
-                >
-                  <Text style={styles.stepperBtn}>+</Text>
-                </TouchableOpacity>
+              <View style={styles.configItem}>
+                <Text style={styles.configLabel}>Max reps</Text>
+                <View style={styles.stepper}>
+                  <TouchableOpacity
+                    onPress={() => updateExerciseConfig(index, { targetRepsRange: [item.targetRepsRange[0], Math.max(item.targetRepsRange[0], item.targetRepsRange[1] - 1)] })}
+                  >
+                    <Text style={styles.stepperBtn}>-</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.stepperValue}>{item.targetRepsRange[1]}</Text>
+                  <TouchableOpacity
+                    onPress={() => updateExerciseConfig(index, { targetRepsRange: [item.targetRepsRange[0], item.targetRepsRange[1] + 1] })}
+                  >
+                    <Text style={styles.stepperBtn}>+</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <View style={styles.configItem}>
+                <Text style={styles.configLabel}>Repos</Text>
+                <View style={styles.stepper}>
+                  <TouchableOpacity
+                    onPress={() => updateExerciseConfig(index, { restSeconds: Math.max(15, item.restSeconds - 15) })}
+                  >
+                    <Text style={styles.stepperBtn}>-</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.stepperValue}>{item.restSeconds}s</Text>
+                  <TouchableOpacity
+                    onPress={() => updateExerciseConfig(index, { restSeconds: item.restSeconds + 15 })}
+                  >
+                    <Text style={styles.stepperBtn}>+</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
           </View>
         </View>
+
+        {/* Superset link button between exercises */}
+        {showSupersetLink && (
+          <TouchableOpacity
+            style={[
+              styles.supersetLinkBtn,
+              linkedWithNext && styles.supersetLinkBtnActive,
+            ]}
+            onPress={() => toggleSuperset(index, index + 1)}
+          >
+            <Text style={[
+              styles.supersetLinkText,
+              linkedWithNext && styles.supersetLinkTextActive,
+            ]}>
+              {linkedWithNext ? '|| Superset ||' : '-- Lier en superset --'}
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
     );
-  }, [moveExercise, removeExercise, updateExerciseConfig]);
+  }, [exercises, moveExercise, removeExercise, updateExerciseConfig, toggleSuperset]);
 
   return (
     <View style={styles.container}>
@@ -203,7 +298,7 @@ export default function CreateProgramScreen({ navigation, route }: any) {
           exercises.length > 0 ? (
             <TouchableOpacity style={styles.saveBtn} onPress={save}>
               <Text style={styles.saveBtnText}>
-                {existing ? 'SAUVEGARDER' : 'CRÉER LE PROGRAMME'}
+                {existing ? 'SAUVEGARDER' : 'CREER LE PROGRAMME'}
               </Text>
             </TouchableOpacity>
           ) : null
@@ -254,12 +349,43 @@ const styles = StyleSheet.create({
   exerciseRow: {
     backgroundColor: colors.card,
     borderRadius: borderRadius.md,
-    marginBottom: spacing.sm,
     flexDirection: 'row',
     borderWidth: 1,
     borderColor: colors.border,
     overflow: 'hidden',
   },
+  exerciseRowSuperset: {
+    borderColor: colors.purple + '60',
+  },
+  supersetBracket: {
+    width: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.purple + '15',
+  },
+  supersetLabel: {
+    fontFamily: fonts.bodyBold,
+    fontSize: 8,
+    color: colors.purple,
+    marginBottom: 2,
+  },
+  bracketLine: {
+    width: 3,
+    flex: 1,
+    backgroundColor: colors.purple,
+    borderRadius: 2,
+  },
+  bracketLineTop: {
+    borderTopLeftRadius: 4,
+    borderTopRightRadius: 4,
+    marginTop: 16,
+  },
+  bracketLineBottom: {
+    borderBottomLeftRadius: 4,
+    borderBottomRightRadius: 4,
+    marginBottom: 16,
+  },
+  bracketLineMiddle: {},
   reorderBtns: {
     justifyContent: 'center',
     alignItems: 'center',
@@ -321,6 +447,24 @@ const styles = StyleSheet.create({
     color: colors.text,
     minWidth: 30,
     textAlign: 'center',
+  },
+  supersetLinkBtn: {
+    alignItems: 'center',
+    paddingVertical: spacing.xs,
+    marginVertical: 2,
+  },
+  supersetLinkBtnActive: {
+    backgroundColor: colors.purple + '15',
+    borderRadius: borderRadius.sm,
+  },
+  supersetLinkText: {
+    fontFamily: fonts.body,
+    fontSize: fontSize.xs,
+    color: colors.muted,
+  },
+  supersetLinkTextActive: {
+    fontFamily: fonts.bodyBold,
+    color: colors.purple,
   },
   saveBtn: {
     backgroundColor: colors.green,

@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet } from 'react-nati
 import { colors, fonts, borderRadius, spacing, fontSize } from '../../theme';
 import { useSessionStore } from '../../stores/sessionStore';
 import { getExerciseById } from '../../data/exercises';
-import { detectFatigue, getCurrentPhase, estimate1RM } from '../../utils/coachEngine';
+import { detectFatigue, getCurrentPhase, estimate1RM, detectMuscleImbalance } from '../../utils/coachEngine';
 import BodyFigure from '../../components/BodyFigure';
 import { MuscleGroup } from '../../types';
 
@@ -78,6 +78,9 @@ export default function StatsScreen({ navigation }: any) {
     }
     return result;
   }, [sessions]);
+
+  // Muscle imbalance detection
+  const muscleImbalances = useMemo(() => detectMuscleImbalance(sessions), [sessions]);
 
   // Unique exercises trained
   const exerciseIds = useMemo(() => {
@@ -160,6 +163,34 @@ export default function StatsScreen({ navigation }: any) {
           <BodyFigure intensityMap={weeklyMuscleMap} width={100} />
         </View>
       </View>
+
+      {/* Muscle imbalance ratios */}
+      {muscleImbalances.length > 0 && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Équilibre musculaire</Text>
+          {muscleImbalances.map((item, i) => {
+            const ratioColor = item.ratio >= 0.8 && item.ratio <= 1.2
+              ? colors.green
+              : item.ratio > 1.5 || item.ratio < 0.67
+                ? colors.red
+                : colors.gold;
+            // Normalize ratio to a bar width (0-1 scale, 1.0 = centered/balanced)
+            const barWidth = Math.min(item.ratio / 2, 1);
+            return (
+              <View key={i} style={styles.ratioCard}>
+                <View style={styles.ratioHeader}>
+                  <Text style={styles.ratioLabel}>{item.muscle}</Text>
+                  <Text style={[styles.ratioValue, { color: ratioColor }]}>{item.ratio.toFixed(2)}:1</Text>
+                </View>
+                <View style={styles.ratioBarBg}>
+                  <View style={[styles.ratioBarFill, { width: `${barWidth * 100}%`, backgroundColor: ratioColor }]} />
+                </View>
+                <Text style={styles.ratioWarning}>{item.warning}</Text>
+              </View>
+            );
+          })}
+        </View>
+      )}
 
       {/* Recent PRs */}
       {recentPRs.length > 0 && (
@@ -336,6 +367,45 @@ const styles = StyleSheet.create({
   },
   exerciseLinkArrow: {
     fontSize: 16,
+    color: colors.muted,
+  },
+  ratioCard: {
+    backgroundColor: colors.card,
+    borderRadius: borderRadius.md,
+    padding: spacing.lg,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  ratioHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  ratioLabel: {
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.md,
+    color: colors.text,
+  },
+  ratioValue: {
+    fontFamily: fonts.heading,
+    fontSize: fontSize.lg,
+  },
+  ratioBarBg: {
+    height: 8,
+    backgroundColor: colors.border,
+    borderRadius: 4,
+    overflow: 'hidden',
+    marginBottom: spacing.sm,
+  },
+  ratioBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  ratioWarning: {
+    fontFamily: fonts.body,
+    fontSize: fontSize.xs,
     color: colors.muted,
   },
 });

@@ -160,6 +160,9 @@ export function generateRecommendation(
     });
     const maxDiff = Math.max(...last3Avgs) - Math.min(...last3Avgs);
     if (maxDiff <= 1) {
+      // Count stagnation periods to cycle through suggestions
+      const stagnationCount = history.sessions.length;
+      const tip = getStagnationTip(exercise, currentWeight, stagnationCount);
       return {
         exerciseId,
         recommendation: 'variation',
@@ -167,7 +170,7 @@ export function generateRecommendation(
         currentWeight,
         reason: `Stagnation détectée sur 3 séances. Essaie une variation technique avant de changer la charge.`,
         confidence: 75,
-        tip: `Même charge (${currentWeight}kg), mais essaie un tempo 3-1-1 (3s descente, 1s pause, 1s montée) pour relancer la progression.`,
+        tip,
         emoji: '💡',
       };
     }
@@ -314,4 +317,96 @@ export function estimate1RM(weight: number, reps: number): number {
   if (reps === 1) return weight;
   if (reps === 0 || weight === 0) return 0;
   return Math.round(weight * (1 + reps / 30) * 10) / 10;
+}
+
+// Stagnation technique suggestions based on exercise type
+function getStagnationTip(exercise: Exercise, currentWeight: number, stagnationCount: number): string {
+  const compoundTips = [
+    `Même charge (${currentWeight}kg). Ajoute une pause de 2s en bas du mouvement pour casser le plateau.`,
+    `Même charge (${currentWeight}kg). Essaie un tempo excentrique 4-0-1 (4s descente, 0 pause, 1s montée).`,
+    `Même charge (${currentWeight}kg). Drop set : fais ton set normal puis baisse de 20% et continue jusqu'à l'échec.`,
+  ];
+
+  const isolationTips = [
+    `Même charge (${currentWeight}kg). Rest-pause : fais ton set, repos 15s, reprends jusqu'à l'échec.`,
+    `Même charge (${currentWeight}kg). Myo-reps : 1 set activation (12-15 reps), puis 4-5 mini-sets de 3-5 reps avec 10s repos.`,
+    `Même charge (${currentWeight}kg). Négatif lent : 5s sur la phase excentrique.`,
+  ];
+
+  const tips = exercise.type === 'compound' ? compoundTips : isolationTips;
+  return tips[stagnationCount % tips.length];
+}
+
+// Muscle imbalance detection
+export function detectMuscleImbalance(sessions: Session[]): { muscle: string; ratio: number; warning: string }[] {
+  const volumeByGroup: Record<string, number> = {};
+
+  for (const session of sessions) {
+    for (const ex of session.exercises) {
+      const info = getExerciseById(ex.exerciseId);
+      if (!info) continue;
+      const vol = ex.sets
+        .filter((set) => set.done)
+        .reduce((sum, set) => sum + set.kg * set.reps, 0);
+      volumeByGroup[info.muscleGroup] = (volumeByGroup[info.muscleGroup] || 0) + vol;
+    }
+  }
+
+  const warnings: { muscle: string; ratio: number; warning: string }[] = [];
+
+  // Push vs Pull: (pectoraux + epaules + triceps) vs (dos + biceps)
+  const pushVol = (volumeByGroup['pectoraux'] || 0) + (volumeByGroup['epaules'] || 0) + (volumeByGroup['triceps'] || 0);
+  const pullVol = (volumeByGroup['dos'] || 0) + (volumeByGroup['biceps'] || 0);
+
+  if (pullVol > 0) {
+    const pushPullRatio = pushVol / pullVol;
+    if (pushPullRatio > 1.5) {
+      warnings.push({
+        muscle: 'Push/Pull',
+        ratio: Math.round(pushPullRatio * 100) / 100,
+        warning: `Déséquilibre Push/Pull (${pushPullRatio.toFixed(2)}:1). Ajoute plus de tirage (dos, biceps).`,
+      });
+    } else if (pushPullRatio < 0.67) {
+      warnings.push({
+        muscle: 'Push/Pull',
+        ratio: Math.round(pushPullRatio * 100) / 100,
+        warning: `Déséquilibre Push/Pull (${pushPullRatio.toFixed(2)}:1). Ajoute plus de poussée (pectoraux, épaules).`,
+      });
+    } else {
+      warnings.push({
+        muscle: 'Push/Pull',
+        ratio: Math.round(pushPullRatio * 100) / 100,
+        warning: 'Équilibre Push/Pull correct.',
+      });
+    }
+  }
+
+  // Quad vs Hamstring
+  const quadVol = volumeByGroup['quadriceps'] || 0;
+  const hamVol = volumeByGroup['ischio_fessiers'] || 0;
+
+  if (hamVol > 0) {
+    const quadHamRatio = quadVol / hamVol;
+    if (quadHamRatio > 1.5) {
+      warnings.push({
+        muscle: 'Quad/Ischio',
+        ratio: Math.round(quadHamRatio * 100) / 100,
+        warning: `Déséquilibre Quad/Ischio (${quadHamRatio.toFixed(2)}:1). Ajoute plus d'ischios (soulevé de terre roumain, leg curl).`,
+      });
+    } else if (quadHamRatio < 0.67) {
+      warnings.push({
+        muscle: 'Quad/Ischio',
+        ratio: Math.round(quadHamRatio * 100) / 100,
+        warning: `Déséquilibre Quad/Ischio (${quadHamRatio.toFixed(2)}:1). Ajoute plus de quadriceps (squat, leg press).`,
+      });
+    } else {
+      warnings.push({
+        muscle: 'Quad/Ischio',
+        ratio: Math.round(quadHamRatio * 100) / 100,
+        warning: 'Équilibre Quad/Ischio correct.',
+      });
+    }
+  }
+
+  return warnings;
 }
