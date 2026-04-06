@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx expo:*)",
+      "Bash(npm install:*)",
+      "Bash(npx tsc:*)",
+      "Bash(CI=1 npx eas update --branch default --message \"v1.5 - Expert set coaching, add/remove sets, my weights config, auto rest times\" --non-interactive)",
+      "Bash(CI=1 npx eas update --branch default --message \"v1.5.1 - Fix adding exercises to existing programs\" --non-interactive)",
+      "Bash(CI=1 npx eas update --branch default --message \"v1.6 - Smart 1RM-based weight increments, remove fixed increments\" --non-interactive)",
+      "Bash(CI=1 npx eas update --branch default --message \"v1.6.1 - Smart 1RM-based weight decreases \\(same Epley logic for down\\)\" --non-interactive)",
+      "Bash(CI=1 npx eas update --branch default --message \"v1.6.1 - Smart 1RM decreases\" --non-interactive)",
+      "Bash(CI=1 npx eas update --branch default --message \"v1.7 - Custom rep ranges, decimal weights, 5s countdown beeps, cleanup settings\" --non-interactive)"
+    ]
+  }
+}
