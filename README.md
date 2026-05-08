@@ -89,9 +89,9 @@ Pour ne **jamais perdre tes données** sur web, **installe l'app sur l'écran d'
 
 Une fois installée, l'app tourne en mode standalone et ses données sont protégées des nettoyages automatiques du navigateur.
 
-### Multi-appareils — chaque appareil est un silo isolé
+### Si tu souhaite uen Sauvegarde Multi-appareils 
 
-> **Aucun pour l'instant.** Chaque utilisateur a ses propres données sur son propre appareil. Il n'y a pas de notion de « compte » partagé entre l'iPhone et le web, **même si tu es la même personne**.
+> **Aucun pour l'instant.** Chaque appareil est un silo isolé, chaque utilisateur a ses propres données sur son propre appareil. Il n'y a pas de notion de « compte » partagé entre l'iPhone et le web, **même si tu es la même personne**.
 
 ```
    ┌──────────────────┐         ┌──────────────────┐
