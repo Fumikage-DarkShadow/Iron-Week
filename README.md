@@ -95,7 +95,7 @@ Une fois installée, l'app tourne en mode standalone et ses données sont proté
 
 ```
    ┌──────────────────┐         ┌──────────────────┐
-   │   📱 Téléphone    │         │   💻 Navigateur   │
+   │   📱 Téléphone   │         │   💻 Navigateur │
    │  AsyncStorage    │         │  localStorage    │
    │   (silo 1)       │         │   (silo 2)       │
    └──────────────────┘         └──────────────────┘
@@ -106,7 +106,7 @@ Si tu fais une séance sur ton téléphone, **elle n'apparaît PAS automatiqueme
 
 ```
    ┌──────────────────┐                    ┌──────────────────┐
-   │   📱 Téléphone    │  ←── push/pull ──→  │   💻 Navigateur   │
+   │   📱 Téléphone   │  ←── push/pull ──→ │   💻 Navigateur │
    └────────┬─────────┘                    └─────────┬────────┘
             │                                        │
             └──────────►  ☁️  data.json  ◄───────────┘
