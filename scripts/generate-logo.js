@@ -220,11 +220,42 @@ async function genFavicon() {
   console.log(`  ✓ favicon.png (192×192 simplified)`);
 }
 
+/* ─────────────────── PWA / iOS specific sizes ─────────────────── */
+async function genPwaIcons() {
+  // Apple touch icon (iOS home screen)
+  const appleSvg = faviconSvg(180);
+  await sharp(Buffer.from(appleSvg))
+    .png()
+    .toFile(path.join(ASSETS_DIR, 'apple-touch-icon.png'));
+  console.log(`  ✓ apple-touch-icon.png (180×180)`);
+
+  // PWA icons
+  const pwa192 = faviconSvg(192);
+  await sharp(Buffer.from(pwa192))
+    .png()
+    .toFile(path.join(ASSETS_DIR, 'pwa-192.png'));
+  console.log(`  ✓ pwa-192.png (192×192)`);
+
+  const pwa512 = faviconSvg(512);
+  await sharp(Buffer.from(pwa512))
+    .png()
+    .toFile(path.join(ASSETS_DIR, 'pwa-512.png'));
+  console.log(`  ✓ pwa-512.png (512×512)`);
+
+  // Maskable icon (Android adaptive)
+  const maskable = faviconSvg(512);
+  await sharp(Buffer.from(maskable))
+    .png()
+    .toFile(path.join(ASSETS_DIR, 'pwa-maskable-512.png'));
+  console.log(`  ✓ pwa-maskable-512.png (512×512)`);
+}
+
 (async () => {
   console.log('Generating Iron Week Pro logo assets...');
   await gen('icon.png', 1024, true);
   await genFavicon();
   await genAdaptive();
   await genSplash();
+  await genPwaIcons();
   console.log('Done.');
 })();
