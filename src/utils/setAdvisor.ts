@@ -1,15 +1,8 @@
 /**
- * Expert Set-by-Set Advisor
+ * Expert Set-by-Set Advisor — clear, actionable messages
  *
- * Uses 1RM-based calculations (Epley formula) to give precise weight
- * recommendations between sets, not fixed +2.5/+5kg jumps.
- *
- * Core math:
- *   1RM = weight × (1 + reps / 30)
- *   target_weight = 1RM / (1 + target_reps / 30)
- *
- * Example: 30 reps at 10kg → 1RM = 20kg → for 8-12 reps = 15kg (+5kg)
- * Example: 12 reps at 80kg → 1RM = 112kg → for 10 reps = 84kg (+4kg)
+ * Uses Epley 1RM formula to give precise weight recommendations
+ * between sets, then formats them into simple readable French.
  */
 
 import { WorkoutSet } from '../types';
@@ -17,8 +10,8 @@ import { calculateNextSetWeight } from './smartIncrement';
 
 export interface SetAdvice {
   suggestedKg: number;
-  message: string;
-  detail: string;
+  message: string;        // Short title (e.g. "✅ Continue à 80kg")
+  detail: string;         // Full explanation in clear French
   type: 'increase' | 'maintain' | 'decrease' | 'first';
   emoji: string;
 }
@@ -33,12 +26,12 @@ export function getSetAdvice(
   const nextSetNumber = doneSets.length + 1;
   const isCompound = exerciseType === 'compound';
 
-  // No sets done — first set
+  // First set
   if (doneSets.length === 0) {
     return {
       suggestedKg: 0,
       message: `Série 1/${totalPlannedSets}`,
-      detail: `Vise ${minReps}-${maxReps} reps. Choisis une charge qui te laisse 1-2 reps en réserve (RPE 8).`,
+      detail: `Vise ${minReps}-${maxReps} reps. Commence avec une charge qui te laisse 1 à 2 reps en réserve à la fin.`,
       type: 'first',
       emoji: '🎯',
     };
@@ -49,40 +42,74 @@ export function getSetAdvice(
     return {
       suggestedKg: lastSet.kg,
       message: `Série ${nextSetNumber}/${totalPlannedSets}`,
-      detail: 'Renseigne la charge et les reps de la série précédente.',
+      detail: 'Renseigne la charge et les reps de ta dernière série.',
       type: 'first',
       emoji: '📝',
     };
   }
 
-  // Use smart 1RM-based calculation
-  const { weight: suggestedKg, reason } = calculateNextSetWeight(
-    lastSet.kg,
-    lastSet.reps,
-    targetRepsRange,
-    isCompound,
-    doneSets.length,
+  const lastReps = lastSet.reps;
+  const lastKg = lastSet.kg;
+
+  // Compute the smart next weight
+  const { weight: smartKg } = calculateNextSetWeight(
+    lastKg, lastReps, targetRepsRange, isCompound, doneSets.length
   );
 
-  const lastReps = lastSet.reps;
-  const diff = suggestedKg - lastSet.kg;
+  const diff = smartKg - lastKg;
+  const inRange = lastReps >= minReps && lastReps <= maxReps;
+  const aboveMax = lastReps > maxReps;
+  const belowMin = lastReps < minReps;
 
-  let type: SetAdvice['type'] = 'maintain';
-  let emoji = '✅';
-
-  if (diff > 0) {
-    type = 'increase';
-    emoji = '🔥';
-  } else if (diff < 0) {
-    type = 'decrease';
-    emoji = lastReps < minReps ? '⚠️' : '🧠';
+  // ─── TROP FACILE → MONTE LA CHARGE ───
+  if (aboveMax) {
+    const repsExtra = lastReps - maxReps;
+    const intensity = repsExtra >= 3 ? 'Trop facile' : 'Un peu facile';
+    const newKg = diff > 0 ? smartKg : lastKg + (isCompound ? 2.5 : 1);
+    const jump = newKg - lastKg;
+    return {
+      suggestedKg: newKg,
+      message: `🔥 ${intensity}, monte à ${newKg}kg`,
+      detail: `OK ${lastReps} reps validées avec ${lastKg}kg, c'est au-dessus de ta cible (${minReps}-${maxReps}).\n\nPasse à ${newKg}kg (+${jump}kg) et vise ${minReps}-${maxReps} reps.`,
+      type: 'increase',
+      emoji: '🔥',
+    };
   }
 
+  // ─── TROP DUR → BAISSE LA CHARGE ───
+  if (belowMin) {
+    const repsShort = minReps - lastReps;
+    const intensity = repsShort >= 3 ? 'Trop lourd' : 'Un peu juste';
+    const newKg = diff < 0 ? smartKg : Math.max(lastKg - (isCompound ? 2.5 : 1), 0);
+    const drop = lastKg - newKg;
+    return {
+      suggestedKg: newKg,
+      message: `⬇️ ${intensity}, baisse à ${newKg}kg`,
+      detail: `Seulement ${lastReps} reps avec ${lastKg}kg, en dessous de ta cible (${minReps}-${maxReps}).\n\nDescends à ${newKg}kg (-${drop}kg) pour atteindre ${minReps} reps minimum.`,
+      type: 'decrease',
+      emoji: '⬇️',
+    };
+  }
+
+  // ─── DANS LA CIBLE ───
+  // Special case: at the bottom of range + accumulating fatigue
+  if (lastReps === minReps && doneSets.length >= 2 && diff < 0) {
+    const drop = lastKg - smartKg;
+    return {
+      suggestedKg: smartKg,
+      message: `💡 Baisse à ${smartKg}kg pour la fatigue`,
+      detail: `${lastReps} reps avec ${lastKg}kg c'est dans la cible mais à la limite basse.\n\nVu la fatigue accumulée, baisse à ${smartKg}kg (-${drop}kg) pour rester dans ${minReps}-${maxReps} reps sur les prochaines séries.`,
+      type: 'decrease',
+      emoji: '💡',
+    };
+  }
+
+  // Default in-range: maintain
   return {
-    suggestedKg,
-    message: `Série ${nextSetNumber}/${totalPlannedSets} → ${suggestedKg}kg`,
-    detail: reason,
-    type,
-    emoji,
+    suggestedKg: lastKg,
+    message: `✅ Continue à ${lastKg}kg`,
+    detail: `OK ${lastReps} reps validées avec ${lastKg}kg, parfait dans ta cible (${minReps}-${maxReps}).\n\nGarde ${lastKg}kg pour la série ${nextSetNumber}, focus sur la technique.`,
+    type: 'maintain',
+    emoji: '✅',
   };
 }
