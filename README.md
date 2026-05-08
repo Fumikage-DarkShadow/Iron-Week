@@ -57,17 +57,76 @@ Pour ne **jamais perdre tes données** sur web, **installe l'app sur l'écran d'
 
 Une fois installée, l'app tourne en mode standalone (sans la barre d'adresse) et ses données sont protégées des nettoyages automatiques du navigateur.
 
-### Multi-appareils
+### Multi-appareils — chaque appareil est un silo isolé
 
-Il n'y a **pas de compte utilisateur ni de cloud auto** — chaque appareil est un silo isolé par défaut. Pour synchroniser tes données entre ton téléphone et le web (ou plusieurs appareils), configure **GitHub Sync** dans `Réglages → Sync GitHub` :
+> **Aucun pour l'instant.** Chaque utilisateur a ses propres données sur son propre appareil. Il n'y a pas de notion de « compte » partagé entre l'iPhone et le web, **même si tu es la même personne**.
 
-1. Crée un [token GitHub personnel](https://github.com/settings/tokens) (scope `repo`)
-2. Crée un repo **privé vide** (ex: `my-iron-week-data`)
-3. Colle le token + nom du repo (`username/my-iron-week-data`) dans l'app
-4. Tap « Synchroniser » → toutes tes séances vont dans `data.json` sur le repo
-5. Sur l'autre appareil, configure les mêmes credentials et fais Pull
+```
+   ┌──────────────────┐         ┌──────────────────┐
+   │   📱 Téléphone    │         │   💻 Navigateur   │
+   │  AsyncStorage    │         │  localStorage    │
+   │   (silo 1)       │         │   (silo 2)       │
+   └──────────────────┘         └──────────────────┘
+            ✗  pas de communication par défaut  ✗
+```
 
-C'est ta sauvegarde cloud, gratuite, privée, et que tu contrôles 100%.
+Si tu fais une séance sur ton téléphone, **elle n'apparaît PAS automatiquement sur le web** (et inversement). Pour les synchroniser, il faut activer **GitHub Sync** — qui transforme un repo GitHub privé en mini-base de données partagée :
+
+```
+   ┌──────────────────┐                    ┌──────────────────┐
+   │   📱 Téléphone    │  ←── push/pull ──→  │   💻 Navigateur   │
+   └────────┬─────────┘                    └─────────┬────────┘
+            │                                        │
+            └──────────►  ☁️  data.json  ◄───────────┘
+                       (repo GitHub privé)
+```
+
+#### Pourquoi GitHub et pas un vrai cloud ?
+
+C'est un choix **privacy-first** : pas de serveur à maintenir, pas d'inscription, pas de collecte de données. Tu utilises **ton propre compte GitHub**, sur **ton propre repo privé**. Personne d'autre n'y a accès — pas même moi, le dev. C'est gratuit (GitHub free) et tu peux migrer ailleurs quand tu veux (le format est juste un JSON).
+
+#### Comment configurer
+
+**Étape 1 — Créer un token GitHub** (5 secondes)
+
+Va sur [github.com/settings/tokens](https://github.com/settings/tokens) → « Generate new token (classic) » → coche **uniquement** le scope `repo` (Full control of private repositories) → copie le token (commence par `ghp_...`).
+
+**Étape 2 — Créer un repo privé vide**
+
+Va sur [github.com/new](https://github.com/new) → nom au choix (ex: `my-iron-week-data`) → coche **Private** → crée le repo. **Ne mets rien dedans**, l'app va créer le `data.json` automatiquement.
+
+**Étape 3 — Renseigner dans l'app**
+
+Dans l'app, va dans `Réglages → Sync GitHub` :
+- Token : colle le `ghp_...`
+- Repo : `username/my-iron-week-data` (ton nom GitHub + nom du repo)
+- Tap **SAUVEGARDER** → l'app teste la connexion
+- Tap **SYNCHRONISER** → upload de toutes tes séances
+
+**Étape 4 — Sur ton 2ème appareil**
+
+Ouvre l'app sur le 2ème appareil (web ou tel) → mêmes credentials → tap SYNCHRONISER. L'app détecte le `data.json` existant et **pull** les données. À chaque séance terminée, l'app push automatiquement.
+
+#### Ce qui est synchronisé
+
+- Toutes tes **séances** (date, charges, reps, RPE, notes)
+- Tes **programmes** (créés ou importés)
+- Le **planning hebdo**
+- Tes **records personnels** (PR)
+- Le **profil de force** (Mes Charges)
+
+#### Ce qui ne l'est pas
+
+- Le token GitHub lui-même (stocké en SecureStore sur native, en localStorage sur web — il faut le renseigner sur chaque appareil)
+- Les notifications planifiées (locales à chaque appareil)
+
+#### Avantages
+
+- **Gratuit** (GitHub Free a des repos privés illimités)
+- **Privé** : tu es seul à voir tes données
+- **Versionné** : chaque sync est un commit, tu peux voir l'historique de tes séances dans GitHub
+- **Portable** : tu peux télécharger le `data.json` à tout moment et l'analyser ailleurs (Excel, Python, etc.)
+- **Aucune dépendance** au dev : si l'app disparaît demain, tes données restent sur ton repo
 
 ---
 
