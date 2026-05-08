@@ -36,13 +36,18 @@ export default function App() {
     );
   }
 
-  if (!settings.hasOnboarded) {
-    return (
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <OnboardingScreen />
-        <StatusBar style="light" />
-      </GestureHandlerRootView>
-    );
+  if (settings.hasOnboarded === false) {
+    try {
+      return (
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <OnboardingScreen />
+          <StatusBar style="light" />
+        </GestureHandlerRootView>
+      );
+    } catch {
+      // If onboarding crashes, skip it
+      useSettingsStore.getState().updateSettings({ hasOnboarded: true });
+    }
   }
 
   return (

@@ -27,6 +27,7 @@ import ExerciseStatsScreen from '../screens/stats/ExerciseStatsScreen';
 // Settings
 import SettingsScreen from '../screens/settings/SettingsScreen';
 import MyWeightsScreen from '../screens/settings/MyWeightsScreen';
+import GithubSyncScreen from '../screens/settings/GithubSyncScreen';
 
 const Tab = createBottomTabNavigator();
 const SettingsStack = createNativeStackNavigator();
@@ -106,6 +107,7 @@ function SettingsStackNavigator() {
     <SettingsStack.Navigator screenOptions={screenOptions}>
       <SettingsStack.Screen name="SettingsHome" component={SettingsScreen} options={{ title: 'Réglages' }} />
       <SettingsStack.Screen name="MyWeights" component={MyWeightsScreen} options={{ title: 'Mes Charges' }} />
+      <SettingsStack.Screen name="GithubSync" component={GithubSyncScreen} options={{ title: 'Sync GitHub' }} />
     </SettingsStack.Navigator>
   );
 }

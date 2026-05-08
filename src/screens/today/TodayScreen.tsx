@@ -158,13 +158,16 @@ export default function TodayScreen({ navigation }: any) {
               </TouchableOpacity>
             )}
 
-            {/* Coach recommendations */}
+            {/* Coach preview — compact summary, details during workout */}
             {recommendations.length > 0 && (
               <View style={styles.coachSection}>
-                <Text style={styles.coachTitle}>Recommandations Coach</Text>
-                {recommendations.map((rec, i) => (
-                  <CoachCard key={i} recommendation={rec} />
+                <Text style={styles.coachTitle}>Aperçu Coach</Text>
+                {recommendations.slice(0, 3).map((rec, i) => (
+                  <CoachCard key={i} recommendation={rec} compact />
                 ))}
+                {recommendations.length > 3 && (
+                  <Text style={styles.coachMore}>+{recommendations.length - 3} autres exercices</Text>
+                )}
               </View>
             )}
           </>
@@ -314,6 +317,13 @@ const styles = StyleSheet.create({
     color: colors.gold,
     marginBottom: spacing.sm,
     letterSpacing: 1,
+  },
+  coachMore: {
+    fontFamily: fonts.body,
+    fontSize: fontSize.xs,
+    color: colors.muted,
+    textAlign: 'center',
+    marginTop: spacing.xs,
   },
   restDayCard: {
     backgroundColor: colors.card,

@@ -263,54 +263,49 @@ export default function ActiveWorkoutScreen({ navigation }: any) {
         {/* Coach suggestion */}
         {recommendation && <CoachCard recommendation={recommendation} compact />}
 
-        {/* Load previous button */}
-        {previousSets.length > 0 && (
-          <TouchableOpacity style={styles.loadPrevBtn} onPress={loadPreviousWeights}>
-            <Text style={styles.loadPrevText}>📋 Reprendre les charges</Text>
+        {/* Compact action bar — grouped */}
+        <View style={styles.actionBar}>
+          {previousSets.length > 0 && (
+            <TouchableOpacity style={styles.actionChip} onPress={loadPreviousWeights}>
+              <Text style={styles.actionChipIcon}>📋</Text>
+              <Text style={styles.actionChipText}>Reprendre</Text>
+            </TouchableOpacity>
+          )}
+          {!currentExercise.sets.some((s) => s.isWarmup) && (
+            <TouchableOpacity
+              style={styles.actionChip}
+              onPress={() => {
+                const firstSetKg = currentExercise.sets[0]?.kg || 0;
+                if (firstSetKg <= 0) {
+                  Alert.alert('Charge manquante', 'Renseigne d\'abord le poids de ta première série.');
+                  return;
+                }
+                const exType: ExerciseType = exerciseInfo?.type || 'compound';
+                const warmups = generateWarmupSets(firstSetKg, currentExercise.targetRepsRange[0], exType === 'compound');
+                const warmupSets: WorkoutSet[] = warmups.map((w, i) => ({
+                  id: `warmup_${Date.now()}_${i}`,
+                  kg: w.kg,
+                  reps: w.reps,
+                  done: false,
+                  isWarmup: true,
+                }));
+                updateExercise(currentExIndex, { sets: [...warmupSets, ...currentExercise.sets] });
+              }}
+            >
+              <Text style={styles.actionChipIcon}>🔥</Text>
+              <Text style={styles.actionChipText}>Échauffement</Text>
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={styles.actionChip} onPress={handleAddSet}>
+            <Text style={styles.actionChipIcon}>➕</Text>
+            <Text style={styles.actionChipText}>Série</Text>
           </TouchableOpacity>
-        )}
-
-        {/* Auto warmup button */}
-        {!currentExercise.sets.some((s) => s.isWarmup) && (
-          <TouchableOpacity
-            style={styles.warmupBtn}
-            onPress={() => {
-              const firstSetKg = currentExercise.sets[0]?.kg || 0;
-              if (firstSetKg <= 0) {
-                Alert.alert('Charge manquante', 'Renseigne d\'abord le poids de ta première série.');
-                return;
-              }
-              const exType: ExerciseType = exerciseInfo?.type || 'compound';
-              const isCompound = exType === 'compound';
-              const warmups = generateWarmupSets(
-                firstSetKg,
-                currentExercise.targetRepsRange[0],
-                isCompound
-              );
-              // Prepend warmup sets before working sets
-              const warmupSets: WorkoutSet[] = warmups.map((w, i) => ({
-                id: `warmup_${Date.now()}_${i}`,
-                kg: w.kg,
-                reps: w.reps,
-                done: false,
-                isWarmup: true,
-              }));
-              updateExercise(currentExIndex, {
-                sets: [...warmupSets, ...currentExercise.sets],
-              });
-            }}
-          >
-            <Text style={styles.warmupBtnText}>🔥 Échauffement auto</Text>
-          </TouchableOpacity>
-        )}
+        </View>
 
         {/* Sets */}
         <View style={styles.setsContainer}>
           <View style={styles.setsHeader}>
-            <Text style={styles.setsTitle}>Séries ({completedSets}/{currentExercise.sets.length})</Text>
-            <TouchableOpacity style={styles.addSetBtn} onPress={handleAddSet}>
-              <Text style={styles.addSetText}>+ Série</Text>
-            </TouchableOpacity>
+            <Text style={styles.setsTitle}>Séries {completedSets}/{currentExercise.sets.length}</Text>
           </View>
 
           {currentExercise.sets.map((set, i) => (
@@ -431,33 +426,28 @@ const styles = StyleSheet.create({
     color: colors.muted,
     marginTop: 4,
   },
-  loadPrevBtn: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.sm,
-    padding: spacing.md,
-    alignItems: 'center',
+  actionBar: {
+    flexDirection: 'row',
+    gap: spacing.xs,
     marginBottom: spacing.md,
+    flexWrap: 'wrap',
+  },
+  actionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.full,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  loadPrevText: {
+  actionChipIcon: { fontSize: 12 },
+  actionChipText: {
     fontFamily: fonts.bodyMedium,
-    fontSize: fontSize.sm,
-    color: colors.blue,
-  },
-  warmupBtn: {
-    backgroundColor: colors.accent2 + '18',
-    borderRadius: borderRadius.sm,
-    padding: spacing.md,
-    alignItems: 'center',
-    marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.accent2 + '40',
-  },
-  warmupBtnText: {
-    fontFamily: fonts.bodyMedium,
-    fontSize: fontSize.sm,
-    color: colors.accent2,
+    fontSize: 12,
+    color: colors.text,
   },
   setsContainer: { marginBottom: spacing.lg },
   setsHeader: {
@@ -470,19 +460,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
     fontSize: fontSize.md,
     color: colors.text,
-  },
-  addSetBtn: {
-    backgroundColor: colors.accent + '15',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.sm,
-    borderWidth: 1,
-    borderColor: colors.accent + '30',
-  },
-  addSetText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: fontSize.sm,
-    color: colors.accent,
   },
   notesContainer: { marginBottom: spacing.lg },
   notesLabel: {

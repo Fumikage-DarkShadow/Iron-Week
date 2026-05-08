@@ -16,40 +16,41 @@ interface Props {
   canDelete?: boolean;
 }
 
+const RPE_COLORS: Record<number, string> = {
+  6: colors.green,
+  7: '#84cc16',
+  8: colors.gold,
+  9: colors.accent2,
+  10: colors.red,
+};
+
 export default function SetRow({
   set, index, previousSet, onUpdate, onToggleDone, onDelete, isNewPR, advice, canDelete,
 }: Props) {
   const estimated = set.done && set.kg > 0 && set.reps > 0 ? estimate1RM(set.kg, set.reps) : null;
 
   return (
-    <View>
-      <View style={[styles.row, set.done && styles.rowDone]}>
-        {/* Delete button */}
-        {canDelete && !set.done && (
-          <TouchableOpacity style={styles.deleteBtn} onPress={onDelete}>
-            <Text style={styles.deleteBtnText}>✕</Text>
-          </TouchableOpacity>
-        )}
-
+    <View style={styles.wrapper}>
+      {/* Main row */}
+      <View style={[styles.row, set.done && styles.rowDone, set.isWarmup && styles.rowWarmup]}>
         <View style={styles.setNumber}>
-          <Text style={styles.setLabel}>{set.isWarmup ? 'W' : `S${index + 1}`}</Text>
+          <Text style={[styles.setLabel, set.isWarmup && { color: colors.gold }]}>
+            {set.isWarmup ? 'W' : index + 1}
+          </Text>
         </View>
 
-        {previousSet && (
-          <View style={styles.prevContainer}>
-            <Text style={styles.prevText}>
-              {previousSet.kg}×{previousSet.reps}
-            </Text>
-          </View>
+        {/* Previous session hint */}
+        {previousSet && !set.done && (
+          <Text style={styles.prevHint}>{previousSet.kg}×{previousSet.reps}</Text>
         )}
 
+        {/* Inputs */}
         <View style={styles.inputContainer}>
           <TextInput
             style={[styles.input, set.done && styles.inputDone]}
             value={set.kg > 0 ? String(set.kg) : ''}
             onChangeText={(t) => {
-              const cleaned = t.replace(',', '.');
-              const val = parseFloat(cleaned);
+              const val = parseFloat(t.replace(',', '.'));
               onUpdate({ kg: isNaN(val) ? 0 : val });
             }}
             keyboardType="decimal-pad"
@@ -69,88 +70,74 @@ export default function SetRow({
           />
         </View>
 
-        {estimated && (
-          <Text style={styles.rmText}>1RM:{estimated}</Text>
-        )}
+        {/* PR badge */}
+        {isNewPR && set.done && <Text style={styles.prBadge}>🏆</Text>}
 
-        {isNewPR && set.done && (
-          <Text style={styles.prBadge}>🏆</Text>
+        {/* Action: validate OR delete */}
+        {set.done ? (
+          <TouchableOpacity style={[styles.actionBtn, styles.actionBtnDone]} onPress={onToggleDone}>
+            <Text style={styles.actionText}>✓</Text>
+          </TouchableOpacity>
+        ) : canDelete ? (
+          <View style={styles.actionRow}>
+            <TouchableOpacity style={styles.deleteBtn} onPress={onDelete}>
+              <Text style={styles.deleteText}>✕</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.actionBtn} onPress={onToggleDone}>
+              <Text style={[styles.actionText, { color: colors.muted }]}>○</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity style={styles.actionBtn} onPress={onToggleDone}>
+            <Text style={[styles.actionText, { color: colors.muted }]}>○</Text>
+          </TouchableOpacity>
         )}
-
-        <TouchableOpacity
-          style={[styles.checkBtn, set.done && styles.checkBtnDone]}
-          onPress={onToggleDone}
-        >
-          <Text style={styles.checkText}>{set.done ? '✓' : ''}</Text>
-        </TouchableOpacity>
       </View>
 
-      {/* RPE selector — shown after set is marked done */}
-      {set.done && (
-        <View style={styles.rpeRow}>
-          <Text style={styles.rpeLabel}>RPE</Text>
-          {([6, 7, 8, 9, 10] as const).map((val) => {
-            const rpeColors: Record<number, string> = {
-              6: colors.green,
-              7: '#84cc16',
-              8: colors.gold,
-              9: colors.accent2,
-              10: colors.red,
-            };
-            const rpeLabels: Record<number, string> = { 6: 'Easy', 10: 'Max' };
-            const isSelected = set.rpe === val;
-            return (
-              <TouchableOpacity
-                key={val}
-                style={[
-                  styles.rpeBtn,
-                  { borderColor: rpeColors[val] + '60' },
-                  isSelected && { backgroundColor: rpeColors[val], borderColor: rpeColors[val] },
-                ]}
-                onPress={() => onUpdate({ rpe: val })}
-              >
-                <Text
+      {/* Secondary info line (1RM + RPE or advice) — hidden by default, shown contextually */}
+      {set.done && estimated && (
+        <View style={styles.secondaryRow}>
+          <Text style={styles.rmInline}>1RM ~{estimated}kg</Text>
+          {/* RPE buttons — compact */}
+          <View style={styles.rpeGroup}>
+            {[6, 7, 8, 9, 10].map((val) => {
+              const isSelected = set.rpe === val;
+              return (
+                <TouchableOpacity
+                  key={val}
                   style={[
-                    styles.rpeBtnText,
-                    { color: isSelected ? colors.white : rpeColors[val] },
+                    styles.rpeDot,
+                    isSelected && { backgroundColor: RPE_COLORS[val], borderColor: RPE_COLORS[val] },
                   ]}
+                  onPress={() => onUpdate({ rpe: val })}
                 >
-                  {val}
-                </Text>
-                {rpeLabels[val] && (
-                  <Text
-                    style={[
-                      styles.rpeBtnSub,
-                      { color: isSelected ? colors.white : rpeColors[val] },
-                    ]}
-                  >
-                    {rpeLabels[val]}
+                  <Text style={[styles.rpeDotText, isSelected && { color: colors.white }]}>
+                    {val}
                   </Text>
-                )}
-              </TouchableOpacity>
-            );
-          })}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
         </View>
       )}
 
-      {/* Per-set coach advice (shown below the set row) */}
+      {/* Coach advice — only for next undone set */}
       {advice && !set.done && (
-        <View style={styles.adviceRow}>
-          <Text style={styles.adviceText}>{advice}</Text>
-        </View>
+        <Text style={styles.adviceText}>{advice}</Text>
       )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrapper: { marginBottom: spacing.xs },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.card,
     borderRadius: borderRadius.sm,
-    padding: spacing.sm,
-    marginBottom: 2,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -158,24 +145,14 @@ const styles = StyleSheet.create({
     borderColor: colors.green + '40',
     backgroundColor: colors.green + '08',
   },
-  deleteBtn: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: colors.red + '20',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: spacing.xs,
-  },
-  deleteBtnText: {
-    fontSize: 10,
-    color: colors.red,
-    fontWeight: 'bold',
+  rowWarmup: {
+    borderColor: colors.gold + '30',
+    backgroundColor: colors.gold + '06',
   },
   setNumber: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: colors.surface,
     justifyContent: 'center',
     alignItems: 'center',
@@ -183,20 +160,15 @@ const styles = StyleSheet.create({
   },
   setLabel: {
     fontFamily: fonts.bodyBold,
-    fontSize: fontSize.xs,
+    fontSize: fontSize.sm,
     color: colors.muted,
   },
-  prevContainer: {
-    marginRight: spacing.xs,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: 2,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.sm,
-  },
-  prevText: {
+  prevHint: {
     fontFamily: fonts.body,
     fontSize: 10,
     color: colors.muted,
+    marginRight: spacing.xs,
+    minWidth: 44,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -206,8 +178,9 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: colors.surface,
     borderRadius: borderRadius.sm,
-    padding: spacing.sm,
-    width: 55,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xs,
+    width: 58,
     textAlign: 'center',
     fontFamily: fonts.bodyBold,
     fontSize: fontSize.md,
@@ -218,6 +191,7 @@ const styles = StyleSheet.create({
   inputDone: {
     borderColor: colors.green + '40',
     color: colors.green,
+    backgroundColor: 'transparent',
   },
   separator: {
     fontFamily: fonts.body,
@@ -225,79 +199,82 @@ const styles = StyleSheet.create({
     color: colors.muted,
     marginHorizontal: spacing.xs,
   },
-  rmText: {
-    fontFamily: fonts.body,
-    fontSize: 10,
-    color: colors.blue,
-    marginHorizontal: 2,
-  },
   prBadge: {
-    fontSize: 16,
-    marginHorizontal: 2,
+    fontSize: 18,
+    marginHorizontal: spacing.xs,
   },
-  checkBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  deleteBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deleteText: {
+    fontSize: 14,
+    color: colors.muted,
+  },
+  actionBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     borderWidth: 2,
     borderColor: colors.border,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: spacing.xs,
   },
-  checkBtnDone: {
+  actionBtnDone: {
     backgroundColor: colors.green,
     borderColor: colors.green,
   },
-  checkText: {
+  actionText: {
     fontFamily: fonts.bodyBold,
     fontSize: fontSize.md,
     color: colors.white,
   },
-  rpeRow: {
+  secondaryRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 2,
-    marginLeft: 30 + spacing.sm,
-    gap: spacing.xs,
+    justifyContent: 'space-between',
+    paddingLeft: 28 + spacing.sm,
+    paddingTop: 4,
+    paddingRight: spacing.sm,
   },
-  rpeLabel: {
+  rmInline: {
     fontFamily: fonts.body,
     fontSize: 10,
-    color: colors.muted,
-    marginRight: spacing.xs,
+    color: colors.blue,
   },
-  rpeBtn: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 3,
-    borderRadius: borderRadius.sm,
+  rpeGroup: {
+    flexDirection: 'row',
+    gap: 4,
+  },
+  rpeDot: {
+    width: 24,
+    height: 20,
+    borderRadius: 10,
     borderWidth: 1,
+    borderColor: colors.border,
+    justifyContent: 'center',
     alignItems: 'center',
-    minWidth: 32,
   },
-  rpeBtnText: {
+  rpeDotText: {
     fontFamily: fonts.bodyBold,
-    fontSize: 11,
-  },
-  rpeBtnSub: {
-    fontFamily: fonts.body,
-    fontSize: 7,
-    marginTop: -1,
-  },
-  adviceRow: {
-    backgroundColor: colors.blue + '10',
-    borderRadius: borderRadius.sm,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    marginBottom: spacing.xs,
-    marginLeft: 30 + spacing.sm,
-    borderLeftWidth: 2,
-    borderLeftColor: colors.blue + '40',
+    fontSize: 10,
+    color: colors.muted,
   },
   adviceText: {
     fontFamily: fonts.body,
     fontSize: fontSize.xs,
     color: colors.blue,
-    lineHeight: 16,
+    paddingLeft: 28 + spacing.sm,
+    paddingTop: 4,
+    paddingRight: spacing.sm,
+    lineHeight: 15,
   },
 });

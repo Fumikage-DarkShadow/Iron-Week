@@ -1,9 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, ScrollView, TextInput, TouchableOpacity, Switch, StyleSheet, Alert } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, Switch, StyleSheet, Alert } from 'react-native';
 import { colors, fonts, borderRadius, spacing, fontSize } from '../../theme';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { useSyncStore } from '../../stores/syncStore';
-import { saveToken, saveRepo, testConnection } from '../../utils/githubSync';
 import { UserGoal, UserLevel, WeightUnit } from '../../types';
 import { useWorkoutStore } from '../../stores/workoutStore';
 import { useSessionStore } from '../../stores/sessionStore';
@@ -24,335 +22,219 @@ const levelLabels: Record<UserLevel, string> = {
   avance: 'Avancé',
 };
 
+interface RowProps {
+  icon: string;
+  title: string;
+  subtitle?: string;
+  onPress?: () => void;
+  value?: string;
+  danger?: boolean;
+  right?: React.ReactNode;
+}
+
+function SettingRow({ icon, title, subtitle, onPress, value, danger, right }: RowProps) {
+  return (
+    <TouchableOpacity style={styles.row} onPress={onPress} disabled={!onPress} activeOpacity={0.6}>
+      <Text style={styles.rowIcon}>{icon}</Text>
+      <View style={styles.rowContent}>
+        <Text style={[styles.rowTitle, danger && { color: colors.red }]}>{title}</Text>
+        {subtitle && <Text style={styles.rowSubtitle}>{subtitle}</Text>}
+      </View>
+      {value && <Text style={styles.rowValue}>{value}</Text>}
+      {right}
+      {onPress && !right && <Text style={styles.rowArrow}>›</Text>}
+    </TouchableOpacity>
+  );
+}
+
 export default function SettingsScreen({ navigation }: any) {
   const { settings, updateSettings } = useSettingsStore();
-  const { status: syncStatus, sync } = useSyncStore();
-  const [token, setToken] = useState(settings.githubToken ? '***' : '');
-  const [repo, setRepo] = useState(settings.githubRepo);
-  const [reminderHour, setReminderHour] = useState<number | null>(null);
   const { sessions } = useSessionStore();
+  const [reminderHour, setReminderHour] = useState<number | null>(null);
 
-  const handleSaveGithub = async () => {
-    if (token && token !== '***') {
-      await saveToken(token);
-      updateSettings({ githubToken: token });
-    }
-    if (repo) {
-      await saveRepo(repo);
-      updateSettings({ githubRepo: repo });
-    }
-
-    const ok = await testConnection();
-    if (ok) {
-      Alert.alert('Connexion réussie', 'GitHub est connecté !');
-    } else {
-      Alert.alert('Erreur', 'Impossible de se connecter. Vérifie ton token et repo.');
-    }
+  // Pickers as alerts — clean inline selection
+  const pickGoal = () => {
+    Alert.alert('Objectif principal', '', [
+      ...Object.keys(goalLabels).map((g) => ({
+        text: goalLabels[g as UserGoal],
+        onPress: () => updateSettings({ goal: g as UserGoal }),
+      })),
+      { text: 'Annuler', style: 'cancel' as const },
+    ]);
   };
 
-  const handleSync = async () => {
-    await sync();
-    const currentStatus = useSyncStore.getState().status;
-    if (currentStatus === 'success') {
-      Alert.alert('Sync OK', 'Données synchronisées !');
-    } else if (currentStatus === 'error') {
-      Alert.alert('Erreur', useSyncStore.getState().error || 'Erreur de synchronisation');
-    }
+  const pickLevel = () => {
+    Alert.alert('Niveau', '', [
+      ...Object.keys(levelLabels).map((l) => ({
+        text: levelLabels[l as UserLevel],
+        onPress: () => updateSettings({ level: l as UserLevel }),
+      })),
+      { text: 'Annuler', style: 'cancel' as const },
+    ]);
+  };
+
+  const pickUnit = () => {
+    Alert.alert('Unité', '', [
+      { text: 'Kilogrammes (kg)', onPress: () => updateSettings({ unit: 'kg' }) },
+      { text: 'Livres (lbs)', onPress: () => updateSettings({ unit: 'lbs' }) },
+      { text: 'Annuler', style: 'cancel' },
+    ]);
+  };
+
+  const pickRest = () => {
+    Alert.alert('Repos par défaut', '', [
+      ...[60, 90, 120, 180].map((s) => ({
+        text: `${s}s`,
+        onPress: () => updateSettings({ defaultRestSeconds: s }),
+      })),
+      { text: 'Annuler', style: 'cancel' as const },
+    ]);
+  };
+
+  const pickReminder = () => {
+    Alert.alert('Rappel quotidien', '', [
+      ...[7, 8, 9, 10, 18, 19].map((h) => ({
+        text: `${h}h00`,
+        onPress: async () => {
+          setReminderHour(h);
+          await scheduleWorkoutReminder(h, 0);
+        },
+      })),
+      {
+        text: 'Désactiver',
+        style: 'destructive' as const,
+        onPress: async () => { await cancelAllReminders(); setReminderHour(null); },
+      },
+      { text: 'Annuler', style: 'cancel' as const },
+    ]);
+  };
+
+  const confirmReset = (full: boolean) => {
+    Alert.alert(
+      full ? 'Tout supprimer ?' : 'Réinitialiser les performances ?',
+      full
+        ? 'Programmes, séances, PRs et planning seront supprimés. Action irréversible.'
+        : 'Séances, PRs et stats supprimés. Tes programmes sont conservés.',
+      [
+        { text: 'Annuler', style: 'cancel' },
+        {
+          text: 'Supprimer',
+          style: 'destructive',
+          onPress: () => {
+            useSessionStore.getState().resetAllData();
+            if (full) useWorkoutStore.getState().resetPrograms();
+          },
+        },
+      ]
+    );
   };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Goal */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Objectif principal</Text>
-        <View style={styles.optionGrid}>
-          {(Object.keys(goalLabels) as UserGoal[]).map((goal) => (
-            <TouchableOpacity
-              key={goal}
-              style={[styles.optionCard, settings.goal === goal && styles.optionCardActive]}
-              onPress={() => updateSettings({ goal })}
-            >
-              <Text style={[styles.optionText, settings.goal === goal && styles.optionTextActive]}>
-                {goalLabels[goal]}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      {/* Level */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Niveau</Text>
-        <View style={styles.optionGrid}>
-          {(Object.keys(levelLabels) as UserLevel[]).map((level) => (
-            <TouchableOpacity
-              key={level}
-              style={[styles.optionCard, settings.level === level && styles.optionCardActive]}
-              onPress={() => updateSettings({ level })}
-            >
-              <Text style={[styles.optionText, settings.level === level && styles.optionTextActive]}>
-                {levelLabels[level]}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      {/* Units */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Unité de poids</Text>
-        <View style={styles.toggleRow}>
-          {(['kg', 'lbs'] as WeightUnit[]).map((unit) => (
-            <TouchableOpacity
-              key={unit}
-              style={[styles.toggleBtn, settings.unit === unit && styles.toggleBtnActive]}
-              onPress={() => updateSettings({ unit })}
-            >
-              <Text style={[styles.toggleText, settings.unit === unit && styles.toggleTextActive]}>
-                {unit.toUpperCase()}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      {/* Default rest */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Repos par défaut</Text>
-        <View style={styles.toggleRow}>
-          {[60, 90, 120, 180].map((sec) => (
-            <TouchableOpacity
-              key={sec}
-              style={[styles.toggleBtn, settings.defaultRestSeconds === sec && styles.toggleBtnActive]}
-              onPress={() => updateSettings({ defaultRestSeconds: sec })}
-            >
-              <Text style={[styles.toggleText, settings.defaultRestSeconds === sec && styles.toggleTextActive]}>
-                {sec}s
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      {/* Toggles */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Préférences</Text>
-        <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>Notifications</Text>
-          <Switch
-            value={settings.notificationsEnabled}
-            onValueChange={(v) => updateSettings({ notificationsEnabled: v })}
-            trackColor={{ false: colors.border, true: colors.accent + '80' }}
-            thumbColor={settings.notificationsEnabled ? colors.accent : colors.muted}
-          />
-        </View>
-        <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>Sons</Text>
-          <Switch
-            value={settings.soundEnabled}
-            onValueChange={(v) => updateSettings({ soundEnabled: v })}
-            trackColor={{ false: colors.border, true: colors.accent + '80' }}
-            thumbColor={settings.soundEnabled ? colors.accent : colors.muted}
-          />
-        </View>
-        <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>Vibrations</Text>
-          <Switch
-            value={settings.hapticEnabled}
-            onValueChange={(v) => updateSettings({ hapticEnabled: v })}
-            trackColor={{ false: colors.border, true: colors.accent + '80' }}
-            thumbColor={settings.hapticEnabled ? colors.accent : colors.muted}
-          />
-        </View>
-
-        {/* Rappel séance */}
-        <View style={{ marginTop: spacing.md }}>
-          <Text style={styles.switchLabel}>Rappel séance</Text>
-          <View style={[styles.toggleRow, { marginTop: spacing.sm }]}>
-            {[7, 8, 9, 10].map((hour) => (
-              <TouchableOpacity
-                key={hour}
-                style={[styles.toggleBtn, reminderHour === hour && styles.toggleBtnActive]}
-                onPress={async () => {
-                  setReminderHour(hour);
-                  await scheduleWorkoutReminder(hour, 0);
-                  Alert.alert('Rappel activé', `Tu seras notifié chaque jour à ${hour}h00.`);
-                }}
-              >
-                <Text style={[styles.toggleText, reminderHour === hour && styles.toggleTextActive]}>
-                  {hour}h
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          {reminderHour !== null && (
-            <TouchableOpacity
-              style={{ marginTop: spacing.sm, alignItems: 'center' }}
-              onPress={async () => {
-                await cancelAllReminders();
-                setReminderHour(null);
-                Alert.alert('Rappel désactivé', 'Plus de notifications de rappel.');
-              }}
-            >
-              <Text style={{ fontFamily: fonts.body, fontSize: fontSize.sm, color: colors.red }}>
-                Désactiver le rappel
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
-      {/* GitHub Sync */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Synchronisation GitHub</Text>
-        <View style={styles.syncStatus}>
-          <Text style={styles.syncIcon}>
-            {syncStatus === 'syncing' ? '⏳' : syncStatus === 'success' ? '✅' : syncStatus === 'error' ? '❌' : '☁️'}
-          </Text>
-          <Text style={styles.syncText}>
-            {syncStatus === 'syncing' ? 'Synchronisation...' :
-              syncStatus === 'success' ? 'Synchronisé' :
-                syncStatus === 'error' ? 'Erreur de sync' : 'Non configuré'}
-          </Text>
-        </View>
-        <TextInput
-          style={styles.input}
-          value={token}
-          onChangeText={setToken}
-          placeholder="Token GitHub (ghp_...)"
-          placeholderTextColor={colors.muted}
-          secureTextEntry
-          autoCapitalize="none"
-        />
-        <TextInput
-          style={styles.input}
-          value={repo}
-          onChangeText={setRepo}
-          placeholder="username/repo-name"
-          placeholderTextColor={colors.muted}
-          autoCapitalize="none"
-        />
-        <View style={styles.githubActions}>
-          <TouchableOpacity style={styles.githubBtn} onPress={handleSaveGithub}>
-            <Text style={styles.githubBtnText}>SAUVEGARDER</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={[styles.githubBtn, styles.syncBtn]} onPress={handleSync}>
-            <Text style={styles.githubBtnText}>SYNC</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* My weights */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Profil de force</Text>
-        <TouchableOpacity
-          style={styles.dataBtn}
+      {/* PROFIL */}
+      <Text style={styles.sectionTitle}>PROFIL</Text>
+      <View style={styles.group}>
+        <SettingRow icon="🎯" title="Objectif" value={goalLabels[settings.goal]} onPress={pickGoal} />
+        <SettingRow icon="📊" title="Niveau" value={levelLabels[settings.level]} onPress={pickLevel} />
+        <SettingRow
+          icon="💪"
+          title="Mes charges"
+          subtitle="Configure tes charges par exercice"
           onPress={() => navigation.navigate('MyWeights')}
-        >
-          <Text style={styles.dataBtnIcon}>💪</Text>
-          <View style={styles.dataBtnContent}>
-            <Text style={styles.dataBtnTitle}>Mes charges</Text>
-            <Text style={styles.dataBtnSub}>Configure tes charges actuelles par exercice pour un coaching personnalisé</Text>
-          </View>
-          <Text style={{ color: colors.muted, fontSize: 18 }}>→</Text>
-        </TouchableOpacity>
+        />
       </View>
 
-      {/* Data management */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Gestion des données</Text>
+      {/* PREFERENCES */}
+      <Text style={styles.sectionTitle}>PRÉFÉRENCES</Text>
+      <View style={styles.group}>
+        <SettingRow icon="⚖️" title="Unité" value={settings.unit.toUpperCase()} onPress={pickUnit} />
+        <SettingRow icon="⏱️" title="Repos par défaut" value={`${settings.defaultRestSeconds}s`} onPress={pickRest} />
+        <SettingRow
+          icon="🔔"
+          title="Rappel séance"
+          value={reminderHour !== null ? `${reminderHour}h00` : 'Off'}
+          onPress={pickReminder}
+        />
+        <SettingRow
+          icon="🔊"
+          title="Sons"
+          right={
+            <Switch
+              value={settings.soundEnabled}
+              onValueChange={(v) => updateSettings({ soundEnabled: v })}
+              trackColor={{ false: colors.border, true: colors.accent + '80' }}
+              thumbColor={settings.soundEnabled ? colors.accent : colors.muted}
+            />
+          }
+        />
+        <SettingRow
+          icon="📳"
+          title="Vibrations"
+          right={
+            <Switch
+              value={settings.hapticEnabled}
+              onValueChange={(v) => updateSettings({ hapticEnabled: v })}
+              trackColor={{ false: colors.border, true: colors.accent + '80' }}
+              thumbColor={settings.hapticEnabled ? colors.accent : colors.muted}
+            />
+          }
+        />
+      </View>
 
-        <TouchableOpacity
-          style={styles.dataBtn}
+      {/* DONNEES */}
+      <Text style={styles.sectionTitle}>DONNÉES</Text>
+      <View style={styles.group}>
+        <SettingRow
+          icon="📥"
+          title="Importer les programmes"
+          subtitle="6 programmes prédéfinis"
           onPress={() => {
             useWorkoutStore.getState().importPrograms(seedPrograms);
-            Alert.alert('Importé', `${seedPrograms.length} programmes importés !`);
+            Alert.alert('Importé', `${seedPrograms.length} programmes ajoutés.`);
           }}
-        >
-          <Text style={styles.dataBtnIcon}>📥</Text>
-          <View style={styles.dataBtnContent}>
-            <Text style={styles.dataBtnTitle}>Importer mes programmes</Text>
-            <Text style={styles.dataBtnSub}>Charge les 6 programmes prédéfinis</Text>
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.dataBtn}
+        />
+        <SettingRow
+          icon="📤"
+          title="Exporter (CSV)"
+          subtitle="Toutes tes séances dans un fichier"
           onPress={async () => {
             if (sessions.length === 0) {
-              Alert.alert('Aucune donnée', 'Tu n\'as pas encore de séances à exporter.');
+              Alert.alert('Vide', 'Aucune séance à exporter.');
               return;
             }
             await shareCSV(sessions);
           }}
-        >
-          <Text style={styles.dataBtnIcon}>📤</Text>
-          <View style={styles.dataBtnContent}>
-            <Text style={styles.dataBtnTitle}>Exporter mes données</Text>
-            <Text style={styles.dataBtnSub}>Exporter toutes les séances en CSV</Text>
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.dataBtn, styles.dataBtnDanger]}
-          onPress={() => {
-            Alert.alert(
-              'Réinitialiser les performances',
-              'Cela supprimera toutes tes séances, PRs et statistiques. Tes programmes seront conservés.',
-              [
-                { text: 'Annuler', style: 'cancel' },
-                {
-                  text: 'Réinitialiser',
-                  style: 'destructive',
-                  onPress: () => {
-                    useSessionStore.getState().resetAllData();
-                    Alert.alert('Fait', 'Toutes les performances ont été supprimées.');
-                  },
-                },
-              ]
-            );
-          }}
-        >
-          <Text style={styles.dataBtnIcon}>🗑️</Text>
-          <View style={styles.dataBtnContent}>
-            <Text style={[styles.dataBtnTitle, { color: colors.red }]}>Réinitialiser les perfs</Text>
-            <Text style={styles.dataBtnSub}>Supprime séances, PRs et stats (garde les programmes)</Text>
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.dataBtn, styles.dataBtnDanger]}
-          onPress={() => {
-            Alert.alert(
-              'Tout supprimer',
-              'Cela supprimera TOUT : programmes, séances, PRs, planning. Cette action est irréversible.',
-              [
-                { text: 'Annuler', style: 'cancel' },
-                {
-                  text: 'Tout supprimer',
-                  style: 'destructive',
-                  onPress: () => {
-                    useSessionStore.getState().resetAllData();
-                    useWorkoutStore.getState().resetPrograms();
-                    Alert.alert('Fait', 'Toutes les données ont été supprimées.');
-                  },
-                },
-              ]
-            );
-          }}
-        >
-          <Text style={styles.dataBtnIcon}>💣</Text>
-          <View style={styles.dataBtnContent}>
-            <Text style={[styles.dataBtnTitle, { color: colors.red }]}>Tout réinitialiser</Text>
-            <Text style={styles.dataBtnSub}>Supprime tout (programmes + performances)</Text>
-          </View>
-        </TouchableOpacity>
+        />
+        <SettingRow
+          icon="☁️"
+          title="Sync GitHub"
+          subtitle="Configurer la sauvegarde"
+          onPress={() => navigation.navigate('GithubSync')}
+        />
       </View>
 
-      {/* App info */}
+      {/* ZONE DANGER */}
+      <Text style={styles.sectionTitle}>ZONE DANGER</Text>
+      <View style={styles.group}>
+        <SettingRow
+          icon="🗑️"
+          title="Réinitialiser les perfs"
+          subtitle="Garde les programmes"
+          danger
+          onPress={() => confirmReset(false)}
+        />
+        <SettingRow
+          icon="💣"
+          title="Tout supprimer"
+          subtitle="Programmes + performances"
+          danger
+          onPress={() => confirmReset(true)}
+        />
+      </View>
+
       <View style={styles.appInfo}>
         <Text style={styles.appName}>IRON WEEK PRO</Text>
-        <Text style={styles.appVersion}>v1.0.0</Text>
+        <Text style={styles.appVersion}>v2.0</Text>
       </View>
     </ScrollView>
   );
@@ -361,157 +243,69 @@ export default function SettingsScreen({ navigation }: any) {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   content: { padding: spacing.lg, paddingBottom: spacing.xxxl * 2 },
-  section: { marginBottom: spacing.xxl },
   sectionTitle: {
     fontFamily: fonts.heading,
-    fontSize: fontSize.lg,
-    color: colors.text,
-    marginBottom: spacing.md,
-    letterSpacing: 1,
+    fontSize: fontSize.sm,
+    color: colors.muted,
+    letterSpacing: 2,
+    marginBottom: spacing.sm,
+    marginTop: spacing.lg,
+    marginLeft: spacing.sm,
   },
-  optionGrid: {
+  group: {
+    backgroundColor: colors.card,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  row: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.sm,
-  },
-  optionCard: {
+    alignItems: 'center',
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    backgroundColor: colors.card,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    minHeight: 56,
   },
-  optionCardActive: {
-    backgroundColor: colors.accent + '20',
-    borderColor: colors.accent,
+  rowIcon: {
+    fontSize: 20,
+    width: 32,
   },
-  optionText: {
-    fontFamily: fonts.bodyMedium,
-    fontSize: fontSize.md,
-    color: colors.muted,
-  },
-  optionTextActive: { color: colors.accent },
-  toggleRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-  },
-  toggleBtn: {
+  rowContent: {
     flex: 1,
-    paddingVertical: spacing.md,
-    backgroundColor: colors.card,
-    borderRadius: borderRadius.sm,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
+    marginLeft: spacing.sm,
   },
-  toggleBtnActive: {
-    backgroundColor: colors.accent,
-    borderColor: colors.accent,
-  },
-  toggleText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: fontSize.md,
-    color: colors.muted,
-  },
-  toggleTextActive: { color: colors.white },
-  switchRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderRadius: borderRadius.sm,
-    padding: spacing.lg,
-    marginBottom: spacing.xs,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  switchLabel: {
+  rowTitle: {
     fontFamily: fonts.bodyMedium,
     fontSize: fontSize.md,
     color: colors.text,
   },
-  syncStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  syncIcon: { fontSize: 20 },
-  syncText: {
-    fontFamily: fonts.body,
-    fontSize: fontSize.md,
-    color: colors.text,
-  },
-  input: {
-    backgroundColor: colors.card,
-    borderRadius: borderRadius.sm,
-    padding: spacing.md,
-    fontFamily: fonts.body,
-    fontSize: fontSize.md,
-    color: colors.text,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: spacing.sm,
-  },
-  githubActions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
-  },
-  githubBtn: {
-    flex: 1,
-    backgroundColor: colors.card,
-    borderRadius: borderRadius.sm,
-    padding: spacing.md,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  syncBtn: {
-    backgroundColor: colors.blue + '20',
-    borderColor: colors.blue + '40',
-  },
-  githubBtnText: {
-    fontFamily: fonts.heading,
-    fontSize: fontSize.sm,
-    color: colors.text,
-    letterSpacing: 1,
-  },
-  dataBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.card,
-    borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: spacing.md,
-  },
-  dataBtnDanger: {
-    borderColor: colors.red + '25',
-  },
-  dataBtnIcon: { fontSize: 22 },
-  dataBtnContent: { flex: 1 },
-  dataBtnTitle: {
-    fontFamily: fonts.bodyBold,
-    fontSize: fontSize.md,
-    color: colors.text,
-  },
-  dataBtnSub: {
+  rowSubtitle: {
     fontFamily: fonts.body,
     fontSize: fontSize.xs,
     color: colors.muted,
     marginTop: 2,
   },
+  rowValue: {
+    fontFamily: fonts.body,
+    fontSize: fontSize.sm,
+    color: colors.muted,
+    marginRight: spacing.xs,
+  },
+  rowArrow: {
+    fontSize: 22,
+    color: colors.muted,
+    marginLeft: spacing.xs,
+  },
   appInfo: {
     alignItems: 'center',
     paddingVertical: spacing.xxl,
+    marginTop: spacing.xl,
   },
   appName: {
     fontFamily: fonts.heading,
-    fontSize: fontSize.xxl,
+    fontSize: fontSize.xl,
     color: colors.accent,
     letterSpacing: 4,
   },
@@ -519,5 +313,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     fontSize: fontSize.sm,
     color: colors.muted,
+    marginTop: 4,
   },
 });
