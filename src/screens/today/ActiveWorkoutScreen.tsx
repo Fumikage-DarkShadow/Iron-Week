@@ -184,6 +184,7 @@ export default function ActiveWorkoutScreen({ navigation }: any) {
   };
 
   const loadPreviousWeights = () => {
+    // Copy exact weights from last session (overrides coach suggestion)
     previousSets.forEach((prev, i) => {
       if (i < currentExercise.sets.length && !currentExercise.sets[i].done) {
         updateSet(currentExIndex, i, { kg: prev.kg });
@@ -268,7 +269,7 @@ export default function ActiveWorkoutScreen({ navigation }: any) {
           {previousSets.length > 0 && (
             <TouchableOpacity style={styles.actionChip} onPress={loadPreviousWeights}>
               <Text style={styles.actionChipIcon}>📋</Text>
-              <Text style={styles.actionChipText}>Reprendre</Text>
+              <Text style={styles.actionChipText}>Charges précédentes</Text>
             </TouchableOpacity>
           )}
           {!currentExercise.sets.some((s) => s.isWarmup) && (

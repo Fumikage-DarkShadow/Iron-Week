@@ -1,212 +1,91 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
-  TextInput,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  Animated,
   Dimensions,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { colors, fonts, fontSize, spacing, borderRadius } from '../../theme';
 import { useSettingsStore } from '../../stores/settingsStore';
-import { useUserWeightsStore } from '../../stores/userWeightsStore';
-import { UserGoal, UserLevel } from '../../types';
+import { useWorkoutStore } from '../../stores/workoutStore';
+import { TEMPLATES, ProgramTemplate } from '../../data/templates';
+import { Program, DayOfWeek } from '../../types';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-const GOALS: { key: UserGoal; label: string; emoji: string; desc: string }[] = [
-  { key: 'masse', label: 'Prise de Masse', emoji: '💪', desc: 'Gagner du muscle et du volume' },
-  { key: 'force', label: 'Force', emoji: '🏋️', desc: 'Devenir plus fort sur les gros lifts' },
-  { key: 'seche', label: 'Sèche', emoji: '🔥', desc: 'Perdre du gras, garder le muscle' },
-  { key: 'endurance', label: 'Endurance', emoji: '🫀', desc: 'Améliorer la capacité cardiovasculaire' },
-];
-
-const LEVELS: { key: UserLevel; label: string; emoji: string; desc: string }[] = [
-  { key: 'debutant', label: 'Débutant', emoji: '🌱', desc: 'Moins de 6 mois de pratique' },
-  { key: 'intermediaire', label: 'Intermédiaire', emoji: '⚡', desc: '6 mois à 2 ans de pratique' },
-  { key: 'avance', label: 'Avancé', emoji: '🏆', desc: 'Plus de 2 ans de pratique régulière' },
-];
-
-const TOP_EXERCISES = [
-  { id: 'pec_dc_barre', label: 'Développé Couché' },
-  { id: 'quads_squat_barre', label: 'Squat' },
-  { id: 'ischio_sdt_roumain', label: 'Soulevé de Terre' },
-  { id: 'epaules_dm_barre', label: 'Développé Militaire' },
-  { id: 'dos_rowing_barre', label: 'Rowing Barre' },
-  { id: 'dos_traction_large', label: 'Tractions' },
-];
+const { width: SCREEN_W } = Dimensions.get('window');
 
 export default function OnboardingScreen() {
-  const [step, setStep] = useState(0);
-  const [goal, setGoal] = useState<UserGoal>('masse');
-  const [level, setLevel] = useState<UserLevel>('intermediaire');
-  const [weights, setWeights] = useState<Record<string, string>>({});
-  const fadeAnim = useRef(new Animated.Value(1)).current;
-
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const { updateSettings } = useSettingsStore();
-  const { setWeight } = useUserWeightsStore();
 
-  const animateTransition = (nextStep: number) => {
-    Animated.timing(fadeAnim, {
-      toValue: 0,
-      duration: 150,
-      useNativeDriver: true,
-    }).start(() => {
-      setStep(nextStep);
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 200,
-        useNativeDriver: true,
-      }).start();
+  const start = () => {
+    if (!selectedId) return;
+    const template = TEMPLATES.find((t) => t.id === selectedId);
+    if (!template) return;
+
+    // Apply level inferred from template
+    updateSettings({ level: template.level });
+
+    // Import the template's programs
+    const now = Date.now();
+    const programs: Program[] = template.programs.map((p) => ({
+      ...p,
+      createdAt: now,
+      updatedAt: now,
+    }));
+    if (programs.length > 0) {
+      useWorkoutStore.getState().importPrograms(programs);
+    }
+
+    // Apply weekly plan
+    const days: DayOfWeek[] = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche'];
+    days.forEach((d) => {
+      const progId = template.weeklyPlan[d];
+      if (progId) {
+        useWorkoutStore.getState().setWeeklyPlan(d, progId);
+      }
     });
+
+    // Mark onboarded
+    updateSettings({ hasOnboarded: true });
   };
-
-  const handleNext = () => {
-    if (step < 2) {
-      animateTransition(step + 1);
-    } else {
-      // Save everything
-      // Save weights
-      Object.entries(weights).forEach(([exerciseId, val]) => {
-        const kg = parseFloat(val.replace(',', '.'));
-        if (!isNaN(kg) && kg > 0) {
-          setWeight(exerciseId, kg);
-        }
-      });
-
-      // Save settings + mark onboarded
-      updateSettings({ goal, level, hasOnboarded: true });
-    }
-  };
-
-  const handleBack = () => {
-    if (step > 0) {
-      animateTransition(step - 1);
-    }
-  };
-
-  const renderStepIndicator = () => (
-    <View style={styles.stepIndicator}>
-      {[0, 1, 2].map((i) => (
-        <View
-          key={i}
-          style={[styles.dot, step === i && styles.dotActive, step > i && styles.dotDone]}
-        />
-      ))}
-    </View>
-  );
-
-  const renderGoalStep = () => (
-    <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>TON OBJECTIF</Text>
-      <Text style={styles.stepSubtitle}>Choisis ton objectif principal</Text>
-      <View style={styles.cardsGrid}>
-        {GOALS.map((g) => (
-          <TouchableOpacity
-            key={g.key}
-            style={[styles.goalCard, goal === g.key && styles.goalCardSelected]}
-            onPress={() => setGoal(g.key)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.goalEmoji}>{g.emoji}</Text>
-            <Text style={styles.goalLabel}>{g.label}</Text>
-            <Text style={styles.goalDesc}>{g.desc}</Text>
-            {goal === g.key && <View style={styles.selectedBadge}><Text style={styles.selectedBadgeText}>✓</Text></View>}
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
-
-  const renderLevelStep = () => (
-    <View style={styles.stepContent}>
-      <Text style={styles.stepTitle}>TON NIVEAU</Text>
-      <Text style={styles.stepSubtitle}>Où en es-tu dans ta pratique?</Text>
-      <View style={styles.levelList}>
-        {LEVELS.map((l) => (
-          <TouchableOpacity
-            key={l.key}
-            style={[styles.levelCard, level === l.key && styles.levelCardSelected]}
-            onPress={() => setLevel(l.key)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.levelEmoji}>{l.emoji}</Text>
-            <View style={styles.levelTextContainer}>
-              <Text style={styles.levelLabel}>{l.label}</Text>
-              <Text style={styles.levelDesc}>{l.desc}</Text>
-            </View>
-            {level === l.key && (
-              <View style={styles.radioSelected}>
-                <View style={styles.radioInner} />
-              </View>
-            )}
-            {level !== l.key && <View style={styles.radioUnselected} />}
-          </TouchableOpacity>
-        ))}
-      </View>
-    </View>
-  );
-
-  const renderWeightsStep = () => (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={styles.stepContent}
-    >
-      <Text style={styles.stepTitle}>TES CHARGES</Text>
-      <Text style={styles.stepSubtitle}>
-        Indique tes charges de travail actuelles (optionnel)
-      </Text>
-      <ScrollView style={styles.weightsScroll} showsVerticalScrollIndicator={false}>
-        {TOP_EXERCISES.map((ex) => (
-          <View key={ex.id} style={styles.weightRow}>
-            <Text style={styles.weightLabel}>{ex.label}</Text>
-            <View style={styles.weightInputContainer}>
-              <TextInput
-                style={styles.weightInput}
-                value={weights[ex.id] || ''}
-                onChangeText={(t) =>
-                  setWeights((prev) => ({ ...prev, [ex.id]: t }))
-                }
-                placeholder="—"
-                placeholderTextColor={colors.muted}
-                keyboardType="decimal-pad"
-                returnKeyType="next"
-              />
-              <Text style={styles.weightUnit}>kg</Text>
-            </View>
-          </View>
-        ))}
-      </ScrollView>
-    </KeyboardAvoidingView>
-  );
 
   return (
     <View style={styles.container}>
-      {renderStepIndicator()}
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Logo + Welcome */}
+        <View style={styles.header}>
+          <Text style={styles.logoText}>IRON WEEK PRO</Text>
+          <Text style={styles.welcomeTitle}>BIENVENUE 💪</Text>
+          <Text style={styles.welcomeSubtitle}>
+            Choisis un programme pour commencer.{'\n'}
+            Tu pourras tout modifier après.
+          </Text>
+        </View>
 
-      <Animated.View style={[styles.animatedContent, { opacity: fadeAnim }]}>
-        {step === 0 && renderGoalStep()}
-        {step === 1 && renderLevelStep()}
-        {step === 2 && renderWeightsStep()}
-      </Animated.View>
+        {/* Templates */}
+        <View style={styles.templatesContainer}>
+          {TEMPLATES.map((tpl) => (
+            <TemplateCard
+              key={tpl.id}
+              template={tpl}
+              selected={selectedId === tpl.id}
+              onPress={() => setSelectedId(tpl.id)}
+            />
+          ))}
+        </View>
+      </ScrollView>
 
-      {/* Navigation buttons */}
+      {/* Bottom CTA */}
       <View style={styles.bottomBar}>
-        {step > 0 ? (
-          <TouchableOpacity style={styles.backBtn} onPress={handleBack}>
-            <Text style={styles.backBtnText}>Retour</Text>
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.backBtn} />
-        )}
-
-        <TouchableOpacity style={styles.nextBtn} onPress={handleNext}>
-          <Text style={styles.nextBtnText}>
-            {step === 2 ? 'Commencer' : 'Suivant'}
+        <TouchableOpacity
+          style={[styles.startBtn, !selectedId && styles.startBtnDisabled]}
+          onPress={start}
+          disabled={!selectedId}
+        >
+          <Text style={[styles.startBtnText, !selectedId && styles.startBtnTextDisabled]}>
+            {selectedId ? 'COMMENCER →' : 'Choisis un programme'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -214,243 +93,207 @@ export default function OnboardingScreen() {
   );
 }
 
+function TemplateCard({
+  template,
+  selected,
+  onPress,
+}: {
+  template: ProgramTemplate;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  const dayCount = Object.keys(template.weeklyPlan).length;
+  return (
+    <TouchableOpacity
+      style={[styles.card, selected && styles.cardSelected]}
+      onPress={onPress}
+      activeOpacity={0.85}
+    >
+      <View style={styles.cardHeader}>
+        <Text style={styles.cardEmoji}>{template.emoji}</Text>
+        <View style={styles.cardTitleBlock}>
+          <Text style={styles.cardName}>{template.name}</Text>
+          <Text style={styles.cardFrequency}>{template.frequency}</Text>
+        </View>
+        {selected && <View style={styles.checkBadge}><Text style={styles.checkBadgeText}>✓</Text></View>}
+      </View>
+
+      <Text style={styles.cardDescription}>{template.description}</Text>
+
+      {/* Programs preview */}
+      {template.programs.length > 0 ? (
+        <View style={styles.programsPreview}>
+          {template.programs.slice(0, 4).map((p) => (
+            <View key={p.id} style={styles.programChip}>
+              <View style={[styles.programDot, { backgroundColor: p.color }]} />
+              <Text style={styles.programChipText} numberOfLines={1}>{p.name}</Text>
+            </View>
+          ))}
+          {template.programs.length > 4 && (
+            <Text style={styles.moreText}>+{template.programs.length - 4}</Text>
+          )}
+        </View>
+      ) : (
+        <Text style={styles.emptyPreview}>Tu créeras tes propres programmes depuis zéro</Text>
+      )}
+    </TouchableOpacity>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.bg,
+  },
+  scrollContent: {
     paddingTop: 60,
+    paddingHorizontal: spacing.lg,
+    paddingBottom: 140,
   },
-  stepIndicator: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-    marginBottom: 24,
+  header: {
+    alignItems: 'center',
+    marginBottom: spacing.xxl,
   },
-  dot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.border,
+  logoText: {
+    fontFamily: fonts.heading,
+    fontSize: fontSize.md,
+    color: colors.accent,
+    letterSpacing: 5,
+    marginBottom: spacing.lg,
   },
-  dotActive: {
-    backgroundColor: colors.accent,
-    width: 28,
-    borderRadius: 5,
-  },
-  dotDone: {
-    backgroundColor: colors.accent,
-  },
-  animatedContent: {
-    flex: 1,
-  },
-  stepContent: {
-    flex: 1,
-    paddingHorizontal: spacing.xl,
-  },
-  stepTitle: {
+  welcomeTitle: {
     fontFamily: fonts.heading,
     fontSize: fontSize.hero,
     color: colors.text,
-    letterSpacing: 2,
-    textAlign: 'center',
+    letterSpacing: 3,
   },
-  stepSubtitle: {
+  welcomeSubtitle: {
     fontFamily: fonts.body,
     fontSize: fontSize.md,
     color: colors.muted,
     textAlign: 'center',
-    marginTop: 8,
-    marginBottom: 32,
+    marginTop: spacing.sm,
+    lineHeight: 22,
   },
-
-  // Goal cards
-  cardsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    justifyContent: 'center',
+  templatesContainer: {
+    gap: spacing.md,
   },
-  goalCard: {
-    width: (SCREEN_WIDTH - 72) / 2,
+  card: {
     backgroundColor: colors.card,
     borderRadius: borderRadius.lg,
-    padding: spacing.xl,
-    alignItems: 'center',
+    padding: spacing.lg,
     borderWidth: 2,
     borderColor: colors.border,
   },
-  goalCardSelected: {
+  cardSelected: {
     borderColor: colors.accent,
-    backgroundColor: colors.accent + '12',
+    backgroundColor: colors.accent + '0d',
   },
-  goalEmoji: {
-    fontSize: 40,
-    marginBottom: 12,
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginBottom: spacing.sm,
   },
-  goalLabel: {
+  cardEmoji: { fontSize: 36 },
+  cardTitleBlock: { flex: 1 },
+  cardName: {
     fontFamily: fonts.bodyBold,
     fontSize: fontSize.lg,
     color: colors.text,
-    textAlign: 'center',
   },
-  goalDesc: {
+  cardFrequency: {
+    fontFamily: fonts.body,
+    fontSize: fontSize.sm,
+    color: colors.muted,
+    marginTop: 2,
+  },
+  checkBadge: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.accent,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkBadgeText: {
+    color: colors.white,
+    fontFamily: fonts.bodyBold,
+    fontSize: fontSize.md,
+  },
+  cardDescription: {
+    fontFamily: fonts.body,
+    fontSize: fontSize.sm,
+    color: colors.text,
+    lineHeight: 20,
+    marginBottom: spacing.md,
+  },
+  programsPreview: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    alignItems: 'center',
+  },
+  programChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.full,
+  },
+  programDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  programChipText: {
+    fontFamily: fonts.bodyMedium,
+    fontSize: 11,
+    color: colors.text,
+    maxWidth: SCREEN_W * 0.45,
+  },
+  moreText: {
+    fontFamily: fonts.body,
+    fontSize: 11,
+    color: colors.muted,
+  },
+  emptyPreview: {
     fontFamily: fonts.body,
     fontSize: fontSize.xs,
     color: colors.muted,
-    textAlign: 'center',
-    marginTop: 6,
+    fontStyle: 'italic',
   },
-  selectedBadge: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: colors.accent,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  selectedBadgeText: {
-    color: colors.white,
-    fontFamily: fonts.bodyBold,
-    fontSize: 14,
-  },
-
-  // Level cards
-  levelList: {
-    gap: 12,
-  },
-  levelCard: {
-    backgroundColor: colors.card,
-    borderRadius: borderRadius.lg,
-    padding: spacing.xl,
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: colors.border,
-  },
-  levelCardSelected: {
-    borderColor: colors.accent,
-    backgroundColor: colors.accent + '12',
-  },
-  levelEmoji: {
-    fontSize: 32,
-    marginRight: 16,
-  },
-  levelTextContainer: {
-    flex: 1,
-  },
-  levelLabel: {
-    fontFamily: fonts.bodyBold,
-    fontSize: fontSize.lg,
-    color: colors.text,
-  },
-  levelDesc: {
-    fontFamily: fonts.body,
-    fontSize: fontSize.sm,
-    color: colors.muted,
-    marginTop: 4,
-  },
-  radioSelected: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: colors.accent,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  radioInner: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: colors.accent,
-  },
-  radioUnselected: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 2,
-    borderColor: colors.border,
-  },
-
-  // Weight inputs
-  weightsScroll: {
-    flex: 1,
-  },
-  weightRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.card,
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  weightLabel: {
-    fontFamily: fonts.bodyMedium,
-    fontSize: fontSize.md,
-    color: colors.text,
-    flex: 1,
-  },
-  weightInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.sm,
-    paddingHorizontal: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  weightInput: {
-    fontFamily: fonts.heading,
-    fontSize: fontSize.xxl,
-    color: colors.accent,
-    width: 70,
-    textAlign: 'center',
-    paddingVertical: spacing.sm,
-  },
-  weightUnit: {
-    fontFamily: fonts.body,
-    fontSize: fontSize.sm,
-    color: colors.muted,
-    marginLeft: 4,
-  },
-
-  // Bottom bar
   bottomBar: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.xxl,
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: spacing.lg,
     paddingBottom: 40,
+    backgroundColor: colors.bg + 'f0',
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
-  backBtn: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
-    minWidth: 100,
-  },
-  backBtnText: {
-    fontFamily: fonts.bodyMedium,
-    fontSize: fontSize.md,
-    color: colors.muted,
-  },
-  nextBtn: {
+  startBtn: {
     backgroundColor: colors.accent,
     borderRadius: borderRadius.md,
     paddingVertical: spacing.lg,
-    paddingHorizontal: spacing.xxxl,
-    minWidth: 140,
     alignItems: 'center',
   },
-  nextBtnText: {
-    fontFamily: fonts.bodyBold,
-    fontSize: fontSize.lg,
+  startBtnDisabled: {
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  startBtnText: {
+    fontFamily: fonts.heading,
+    fontSize: fontSize.xl,
     color: colors.white,
+    letterSpacing: 2,
+  },
+  startBtnTextDisabled: {
+    color: colors.muted,
   },
 });

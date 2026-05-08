@@ -207,32 +207,24 @@ function ruleFirstTime(exercise: Exercise, goal: UserGoal, userKnownWeight?: num
     };
   }
 
-  const percent = get1RMPercentForGoal(goal);
-  const estimatedStartWeights: Record<string, number> = {
-    pectoraux: 40,
-    dos: 40,
-    epaules: 25,
-    biceps: 15,
-    triceps: 15,
-    quadriceps: 60,
-    ischio_fessiers: 50,
-    mollets: 30,
-    abdos: 0,
-    lombaires: 0,
-    cardio: 0,
-  };
-  const base = estimatedStartWeights[exercise.muscleGroup] || 20;
-  const suggested = roundToNearest(base * percent, getIncrement(exercise));
+  // No history, no profile — give qualitative advice instead of a random number
+  const equipmentNote = exercise.equipment.includes('barre')
+    ? 'Échauffe-toi avec la barre vide (20 kg) puis ajoute progressivement.'
+    : exercise.equipment.includes('halteres')
+    ? 'Prends des haltères légères pour t\'échauffer et tester le mouvement.'
+    : exercise.equipment.includes('machine')
+    ? 'Commence à la moitié de ce que tu penses pouvoir faire.'
+    : 'Commence avec ton poids du corps ou très léger.';
 
   return {
     exerciseId: exercise.id,
     recommendation: 'first_time',
-    suggestedWeight: suggested,
+    suggestedWeight: 0,
     currentWeight: 0,
-    reason: `Première séance ! Commence léger pour apprendre le mouvement.`,
-    confidence: 50,
-    tip: `Charge suggérée : ${suggested}kg. Va dans Réglages → Mes charges pour configurer tes charges actuelles.`,
-    emoji: '🆕',
+    reason: `Première séance — pas de données pour suggérer une charge précise.`,
+    confidence: 0,
+    tip: `${equipmentNote}\n\nObjectif : trouve la charge où tu fais ${exercise.defaultRepsRange[0]}-${exercise.defaultRepsRange[1]} reps avec 1-2 reps en réserve.`,
+    emoji: '🧭',
   };
 }
 

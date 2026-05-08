@@ -59,14 +59,34 @@ export default function TodayScreen({ navigation }: any) {
       exercises: todayProgram.exercises.map((pe) => {
         const rec = recommendations.find((r) => r.exerciseId === pe.exerciseId);
         const suggestedKg = rec?.suggestedWeight || 0;
+
+        // Smart auto-fill: find the most recent session for this exercise
+        // and use its kg/reps as a fallback (in case the coach has no recommendation yet)
+        const lastSession = sessions
+          .filter((s) => s.exercises.some((e) => e.exerciseId === pe.exerciseId))
+          .sort((a, b) => b.startedAt - a.startedAt)[0];
+        const lastEx = lastSession?.exercises.find((e) => e.exerciseId === pe.exerciseId);
+        const lastDoneSets = lastEx?.sets.filter((s) => s.done) || [];
+
         return {
           exerciseId: pe.exerciseId,
-          sets: Array.from({ length: pe.targetSets }, (_, i): WorkoutSet => ({
-            id: `set_${Date.now()}_${i}`,
-            kg: suggestedKg,
-            reps: 0,
-            done: false,
-          })),
+          sets: Array.from({ length: pe.targetSets }, (_, i): WorkoutSet => {
+            // Priority order:
+            // 1. Coach recommended weight (smart 1RM-based)
+            // 2. Last session's kg for this set position
+            // 3. Last session's first set kg
+            // 4. 0 (user fills it in)
+            const lastSetAtIndex = lastDoneSets[i];
+            const fallbackKg = lastSetAtIndex?.kg || lastDoneSets[0]?.kg || 0;
+            const finalKg = suggestedKg > 0 ? suggestedKg : fallbackKg;
+
+            return {
+              id: `set_${Date.now()}_${i}`,
+              kg: finalKg,
+              reps: 0,
+              done: false,
+            };
+          }),
           targetSets: pe.targetSets,
           targetRepsRange: pe.targetRepsRange,
           restSeconds: pe.restSeconds,

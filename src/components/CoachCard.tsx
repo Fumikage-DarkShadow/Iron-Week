@@ -22,13 +22,15 @@ export default function CoachCard({ recommendation, compact }: Props) {
   const exercise = getExerciseById(recommendation.exerciseId);
   const style = typeStyles[recommendation.recommendation];
 
+  const noWeight = recommendation.suggestedWeight <= 0;
+
   if (compact) {
     return (
       <View style={[styles.compactCard, { backgroundColor: style.bg, borderColor: style.border }]}>
         <Text style={styles.emoji}>{recommendation.emoji}</Text>
         <View style={styles.compactContent}>
           <Text style={[styles.compactTitle, { color: style.accent }]}>
-            {recommendation.suggestedWeight}kg
+            {noWeight ? 'À découvrir' : `${recommendation.suggestedWeight}kg`}
           </Text>
           <Text style={styles.compactReason} numberOfLines={1}>{recommendation.reason}</Text>
         </View>
@@ -42,21 +44,25 @@ export default function CoachCard({ recommendation, compact }: Props) {
         <Text style={styles.emoji}>{recommendation.emoji}</Text>
         <View style={styles.headerContent}>
           <Text style={styles.exerciseName}>{exercise?.nameFr || recommendation.exerciseId}</Text>
-          <View style={styles.weightRow}>
-            {recommendation.currentWeight > 0 && (
-              <Text style={styles.currentWeight}>{recommendation.currentWeight}kg</Text>
-            )}
-            {recommendation.currentWeight > 0 && recommendation.suggestedWeight !== recommendation.currentWeight && (
-              <Text style={[styles.arrow, { color: style.accent }]}> → </Text>
-            )}
-            <Text style={[styles.suggestedWeight, { color: style.accent }]}>
-              {recommendation.suggestedWeight}kg
-            </Text>
+          {!noWeight && (
+            <View style={styles.weightRow}>
+              {recommendation.currentWeight > 0 && (
+                <Text style={styles.currentWeight}>{recommendation.currentWeight}kg</Text>
+              )}
+              {recommendation.currentWeight > 0 && recommendation.suggestedWeight !== recommendation.currentWeight && (
+                <Text style={[styles.arrow, { color: style.accent }]}> → </Text>
+              )}
+              <Text style={[styles.suggestedWeight, { color: style.accent }]}>
+                {recommendation.suggestedWeight}kg
+              </Text>
+            </View>
+          )}
+        </View>
+        {recommendation.confidence > 0 && (
+          <View style={styles.confidenceBadge}>
+            <Text style={styles.confidenceText}>{recommendation.confidence}%</Text>
           </View>
-        </View>
-        <View style={styles.confidenceBadge}>
-          <Text style={styles.confidenceText}>{recommendation.confidence}%</Text>
-        </View>
+        )}
       </View>
       <Text style={styles.reason}>{recommendation.reason}</Text>
       <Text style={[styles.tip, { color: style.accent }]}>{recommendation.tip}</Text>
