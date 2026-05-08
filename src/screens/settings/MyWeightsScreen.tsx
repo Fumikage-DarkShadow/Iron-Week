@@ -31,7 +31,9 @@ export default function MyWeightsScreen() {
   const configuredCount = Object.values(weights).filter((v) => v > 0).length;
 
   const handleWeightChange = (exerciseId: string, text: string) => {
-    const val = parseFloat(text);
+    // Accept both comma and dot for decimals
+    const cleaned = text.replace(',', '.');
+    const val = parseFloat(cleaned);
     if (isNaN(val) || val <= 0) {
       removeWeight(exerciseId);
     } else {
@@ -116,7 +118,7 @@ export default function MyWeightsScreen() {
                   style={[styles.kgInput, currentVal ? styles.kgInputFilled : null]}
                   value={currentVal ? String(currentVal) : ''}
                   onChangeText={(t) => handleWeightChange(item.id, t)}
-                  keyboardType="numeric"
+                  keyboardType="decimal-pad"
                   placeholder="—"
                   placeholderTextColor={colors.muted}
                 />

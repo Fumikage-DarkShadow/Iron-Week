@@ -72,7 +72,7 @@ export default function OnboardingScreen() {
       // Save everything
       // Save weights
       Object.entries(weights).forEach(([exerciseId, val]) => {
-        const kg = parseFloat(val);
+        const kg = parseFloat(val.replace(',', '.'));
         if (!isNaN(kg) && kg > 0) {
           setWeight(exerciseId, kg);
         }
@@ -173,7 +173,7 @@ export default function OnboardingScreen() {
                 }
                 placeholder="—"
                 placeholderTextColor={colors.muted}
-                keyboardType="numeric"
+                keyboardType="decimal-pad"
                 returnKeyType="next"
               />
               <Text style={styles.weightUnit}>kg</Text>
