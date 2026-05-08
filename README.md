@@ -89,7 +89,7 @@ Pour ne **jamais perdre tes données** sur web, **installe l'app sur l'écran d'
 
 Une fois installée, l'app tourne en mode standalone et ses données sont protégées des nettoyages automatiques du navigateur.
 
-### Si tu souhaite uen Sauvegarde Multi-appareils 
+### Si tu souhaite une Sauvegarde Multi-appareils 
 
 > **Aucun pour l'instant.** Chaque appareil est un silo isolé, chaque utilisateur a ses propres données sur son propre appareil. Il n'y a pas de notion de « compte » partagé entre l'iPhone et le web, **même si tu es la même personne**.
 
@@ -112,10 +112,6 @@ Si tu fais une séance sur ton téléphone, **elle n'apparaît PAS automatiqueme
             └──────────►  ☁️  data.json  ◄───────────┘
                        (repo GitHub privé)
 ```
-
-#### Pourquoi GitHub et pas un vrai cloud ?
-
-C'est un choix **privacy-first** : pas de serveur à maintenir, pas d'inscription, pas de collecte de données. Tu utilises **ton propre compte GitHub**, sur **ton propre repo privé**. Personne d'autre n'y a accès — pas même moi, le dev. C'est gratuit (GitHub free) et tu peux migrer ailleurs quand tu veux.
 
 #### Comment configurer
 
