@@ -1,4 +1,4 @@
-import * as SecureStore from 'expo-secure-store';
+import { getSecureItem, setSecureItem } from './webStorage';
 
 const GITHUB_API = 'https://api.github.com';
 const FILE_PATH = 'data.json';
@@ -13,27 +13,19 @@ interface SyncData {
 }
 
 async function getToken(): Promise<string | null> {
-  try {
-    return await SecureStore.getItemAsync('github_token');
-  } catch {
-    return null;
-  }
+  return getSecureItem('github_token');
 }
 
 async function getRepo(): Promise<string | null> {
-  try {
-    return await SecureStore.getItemAsync('github_repo');
-  } catch {
-    return null;
-  }
+  return getSecureItem('github_repo');
 }
 
 export async function saveToken(token: string): Promise<void> {
-  await SecureStore.setItemAsync('github_token', token);
+  await setSecureItem('github_token', token);
 }
 
 export async function saveRepo(repo: string): Promise<void> {
-  await SecureStore.setItemAsync('github_repo', repo);
+  await setSecureItem('github_repo', repo);
 }
 
 async function githubFetch(path: string, options: RequestInit = {}): Promise<Response> {
@@ -76,7 +68,6 @@ export async function pushData(data: SyncData): Promise<boolean> {
   if (!token) return false;
 
   try {
-    // Get current file SHA if exists
     let sha: string | undefined;
     const getRes = await githubFetch(`/repos/${repo}/contents/${FILE_PATH}`);
     if (getRes.ok) {

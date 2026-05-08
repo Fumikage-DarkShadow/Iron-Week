@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta httpEquiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no" />
+  <title>Iron Week Pro</title>
+  <style id="expo-reset">
+    html, body { height: 100%; margin: 0; background: #0a0a0f; color: #e8e8f0; }
+    body { overflow: hidden; }
+    #root { display: flex; height: 100%; flex: 1; }
+    #boot-error { display: none; padding: 24px; font: 12px monospace; color: #ef4444; white-space: pre-wrap; height: 100vh; overflow: auto; }
+  </style>
+  <script>
+    // Inline error capture — runs BEFORE bundle loads
+    (function() {
+      window.__bootErrors = [];
+      function show(html) {
+        var box = document.getElementById('boot-error');
+        if (box) { box.style.display = 'block'; box.innerHTML += html + '\n\n'; }
+      }
+      window.addEventListener('error', function(e) {
+        window.__bootErrors.push({ type: 'error', message: e.message, file: e.filename, line: e.lineno, stack: e.error && e.error.stack });
+        show('ERREUR: ' + e.message + '\n  at ' + e.filename + ':' + e.lineno + '\n' + (e.error && e.error.stack || ''));
+      });
+      window.addEventListener('unhandledrejection', function(e) {
+        var r = e.reason;
+        window.__bootErrors.push({ type: 'rejection', reason: String(r), stack: r && r.stack });
+        show('PROMESSE REJETEE: ' + String(r) + '\n' + (r && r.stack || ''));
+      });
+      // If after 10s nothing rendered, show captured errors
+      setTimeout(function() {
+        var root = document.getElementById('root');
+        if (root && root.children.length === 0) {
+          show('PAS DE RENDU APRES 10s\n\nErreurs:\n' + JSON.stringify(window.__bootErrors, null, 2));
+        }
+      }, 10000);
+    })();
+  </script>
+</head>
+<body>
+  <noscript>You need to enable JavaScript to run this app.</noscript>
+  <div id="root"></div>
+  <pre id="boot-error"></pre>
+</body>
+</html>
