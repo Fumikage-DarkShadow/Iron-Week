@@ -36,17 +36,49 @@ Une app de musculation qui pense pour toi. Tu choisis un programme, tu fais ta s
 
 ---
 
+## Fonctionnalités clés
+
+### 🧠 Coach IA basé sur la formule d'Epley
+Le coach calcule ton 1RM estimé en temps réel (`1RM = poids × (1 + reps/30)`) et propose la charge optimale pour la série suivante, pas un `+2.5kg` fixe.
+
+**Exemple** : tu fais 12 reps à 80kg sur un exercice qui vise 8-10 reps.
+- 1RM estimé : 80 × (1 + 12/30) = 112kg
+- Charge cible pour 9 reps : 112 / (1 + 9/30) = **86kg → suggestion +5kg**
+
+### 📊 5 règles de progression
+1. **Double progressive overload** — atteint le max 2 séances de suite ? Monte la charge.
+2. **Consolidation** — toutes les séries pas dans la cible ? Maintiens.
+3. **Deload automatique** — chute de 20%+ vs ta meilleure ? Récupère.
+4. **Stagnation** — 3 séances identiques ? Variation technique (rest-pause, myo-reps, tempo).
+5. **Première séance** — pas d'historique ? Conseils qualitatifs, pas de chiffre inventé.
+
+### ⏱️ Timer de repos qui sonne même téléphone verrouillé
+Notification locale planifiée à `now + restSeconds`. Le téléphone vibre et sonne même si l'app est fermée.
+
+### 💪 117 exercices + 4 templates
+Push/Pull/Legs · Upper/Lower · Full Body 3x · Programme libre. Schémas anatomiques SVG, fiches détaillées, exercices substituts.
+
+### 🔗 Supersets, RPE, échauffement auto, partage de séance
+- Lier 2 exercices en superset (un seul timer entre les deux)
+- Tracker l'effort ressenti (RPE 6-10) après chaque série
+- Génération automatique de séries d'échauffement (50% × 10, 70% × 5, 85% × 3)
+- Partage du résumé de séance en image (Instagram, WhatsApp, etc.)
+
+### 📈 Stats & analytics
+- Streak, volume hebdomadaire, fréquence sur 8 semaines
+- Détection de fatigue / progression / stagnation
+- Périodisation auto (Accumulation → Intensification → Réalisation → Deload)
+- Ratios push/pull et quad/ischio
+- Graphiques SVG par exercice (charge max, 1RM estimé, volume)
+
+### ☁️ Sync GitHub + export CSV
+Sauvegarde de toutes tes séances dans un repo GitHub privé (`data.json`). Export CSV pour analyse externe.
+
+---
+
 ## ⚠️ Important — Sauvegarde des données
 
 L'app est **100% locale** (pas de serveur, pas de compte). Tes séances sont stockées sur ton appareil. Selon comment tu utilises l'app, la sauvegarde se comporte différemment :
-
-| Tu utilises l'app via... | Sauvegarde | Risque |
-| --- | --- | --- |
-| **Expo Go ou build natif** (mobile) | AsyncStorage (SQLite) | Aucun — persiste jusqu'à désinstall |
-| **PWA installée sur l'écran d'accueil** ✅ | `localStorage` (contexte standalone) | Aucun — persiste comme une vraie app |
-| **Onglet navigateur classique sur iOS Safari** ⚠️ | `localStorage` | **iOS supprime les données après 7 jours d'inactivité** (politique ITP d'Apple) |
-| **Onglet navigateur Android Chrome / desktop** | `localStorage` | Effacé si tu vides le cache du navigateur |
-| **Mode privé / navigation privée** | Volatile | Tout disparaît à la fermeture |
 
 ### 👉 Ce que tu dois faire
 
@@ -55,7 +87,7 @@ Pour ne **jamais perdre tes données** sur web, **installe l'app sur l'écran d'
 - **iOS Safari** : bouton « Partager » → « Sur l'écran d'accueil »
 - **Android Chrome** : menu ⋮ → « Ajouter à l'écran d'accueil » (ou bandeau d'install qui apparaît automatiquement)
 
-Une fois installée, l'app tourne en mode standalone (sans la barre d'adresse) et ses données sont protégées des nettoyages automatiques du navigateur.
+Une fois installée, l'app tourne en mode standalone et ses données sont protégées des nettoyages automatiques du navigateur.
 
 ### Multi-appareils — chaque appareil est un silo isolé
 
@@ -83,7 +115,7 @@ Si tu fais une séance sur ton téléphone, **elle n'apparaît PAS automatiqueme
 
 #### Pourquoi GitHub et pas un vrai cloud ?
 
-C'est un choix **privacy-first** : pas de serveur à maintenir, pas d'inscription, pas de collecte de données. Tu utilises **ton propre compte GitHub**, sur **ton propre repo privé**. Personne d'autre n'y a accès — pas même moi, le dev. C'est gratuit (GitHub free) et tu peux migrer ailleurs quand tu veux (le format est juste un JSON).
+C'est un choix **privacy-first** : pas de serveur à maintenir, pas d'inscription, pas de collecte de données. Tu utilises **ton propre compte GitHub**, sur **ton propre repo privé**. Personne d'autre n'y a accès — pas même moi, le dev. C'est gratuit (GitHub free) et tu peux migrer ailleurs quand tu veux.
 
 #### Comment configurer
 
@@ -126,85 +158,7 @@ Ouvre l'app sur le 2ème appareil (web ou tel) → mêmes credentials → tap SY
 - **Privé** : tu es seul à voir tes données
 - **Versionné** : chaque sync est un commit, tu peux voir l'historique de tes séances dans GitHub
 - **Portable** : tu peux télécharger le `data.json` à tout moment et l'analyser ailleurs (Excel, Python, etc.)
-- **Aucune dépendance** au dev : si l'app disparaît demain, tes données restent sur ton repo
-
----
-
-## Fonctionnalités clés
-
-### 🧠 Coach IA basé sur la formule d'Epley
-Le coach calcule ton 1RM estimé en temps réel (`1RM = poids × (1 + reps/30)`) et propose la charge optimale pour la série suivante, pas un `+2.5kg` fixe.
-
-**Exemple** : tu fais 12 reps à 80kg sur un exercice qui vise 8-10 reps.
-- 1RM estimé : 80 × (1 + 12/30) = 112kg
-- Charge cible pour 9 reps : 112 / (1 + 9/30) = **86kg → suggestion +5kg**
-
-### 📊 5 règles de progression
-1. **Double progressive overload** — atteint le max 2 séances de suite ? Monte la charge.
-2. **Consolidation** — toutes les séries pas dans la cible ? Maintiens.
-3. **Deload automatique** — chute de 20%+ vs ta meilleure ? Récupère.
-4. **Stagnation** — 3 séances identiques ? Variation technique (rest-pause, myo-reps, tempo).
-5. **Première séance** — pas d'historique ? Conseils qualitatifs, pas de chiffre inventé.
-
-### ⏱️ Timer de repos qui sonne même téléphone verrouillé
-Notification locale planifiée à `now + restSeconds`. Le téléphone vibre et sonne même si l'app est fermée.
-
-### 💪 117 exercices + 4 templates
-Push/Pull/Legs · Upper/Lower · Full Body 3x · Programme libre. Schémas anatomiques SVG, fiches détaillées, exercices substituts.
-
-### 🔗 Supersets, RPE, échauffement auto, partage de séance
-- Lier 2 exercices en superset (un seul timer entre les deux)
-- Tracker l'effort ressenti (RPE 6-10) après chaque série
-- Génération automatique de séries d'échauffement (50% × 10, 70% × 5, 85% × 3)
-- Partage du résumé de séance en image (Instagram, WhatsApp, etc.)
-
-### 📈 Stats & analytics
-- Streak, volume hebdomadaire, fréquence sur 8 semaines
-- Détection de fatigue / progression / stagnation
-- Périodisation auto (Accumulation → Intensification → Réalisation → Deload)
-- Ratios push/pull et quad/ischio
-- Graphiques SVG par exercice (charge max, 1RM estimé, volume)
-
-### ☁️ Sync GitHub + export CSV
-Sauvegarde de toutes tes séances dans un repo GitHub privé (`data.json`). Export CSV pour analyse externe.
-
----
-
-## Architecture
-
-```
-src/
-├── components/    # SetRow, RestTimer, CoachCard, BodyFigure, MuscleMap...
-├── data/          # 117 exercices + 4 templates + 6 seed programs
-├── navigation/    # Bottom tabs + stack par tab
-├── screens/
-│   ├── today/     # Aujourd'hui, séance active, résumé post-séance
-│   ├── program/   # Liste, création, planning hebdo
-│   ├── exercises/ # Bibliothèque + détail
-│   ├── stats/     # Dashboard + stats par exercice
-│   └── settings/  # Profil, mes charges, sync, données
-├── stores/        # Zustand (sessions, programs, settings, sync, userWeights)
-├── theme/         # Couleurs, polices, spacing
-├── types/         # Interfaces TypeScript
-└── utils/
-    ├── coachEngine.ts       # 5 règles + recommandations
-    ├── smartIncrement.ts    # Calcul Epley pour next set/session
-    ├── setAdvisor.ts        # Messages clairs entre séries
-    ├── warmupGenerator.ts   # Échauffement auto
-    ├── webStorage.ts        # SecureStore shim pour le web
-    └── notifications.ts     # Rappels + timer en background
-```
-
----
-
-## Roadmap / idées
-
-- [ ] Mode "guidage" pendant la séance (un seul exercice à la fois en plein écran)
-- [ ] Saisie kg/reps via clavier numérique géant pour la salle
-- [ ] Mode circuit / WOD avec timer rounds
-- [ ] Recherche d'exercices fuzzy + filtre par équipement
-- [ ] Confetti animé sur PR battu (déjà présent, à amplifier)
-- [ ] Apple Health / Google Fit sync
+- **Aucune dépendance** : si l'app disparaît demain, tes données restent sur ton repo
 
 ---
 
