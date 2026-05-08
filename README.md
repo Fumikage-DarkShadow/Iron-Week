@@ -36,6 +36,41 @@ Une app de musculation qui pense pour toi. Tu choisis un programme, tu fais ta s
 
 ---
 
+## ⚠️ Important — Sauvegarde des données
+
+L'app est **100% locale** (pas de serveur, pas de compte). Tes séances sont stockées sur ton appareil. Selon comment tu utilises l'app, la sauvegarde se comporte différemment :
+
+| Tu utilises l'app via... | Sauvegarde | Risque |
+| --- | --- | --- |
+| **Expo Go ou build natif** (mobile) | AsyncStorage (SQLite) | Aucun — persiste jusqu'à désinstall |
+| **PWA installée sur l'écran d'accueil** ✅ | `localStorage` (contexte standalone) | Aucun — persiste comme une vraie app |
+| **Onglet navigateur classique sur iOS Safari** ⚠️ | `localStorage` | **iOS supprime les données après 7 jours d'inactivité** (politique ITP d'Apple) |
+| **Onglet navigateur Android Chrome / desktop** | `localStorage` | Effacé si tu vides le cache du navigateur |
+| **Mode privé / navigation privée** | Volatile | Tout disparaît à la fermeture |
+
+### 👉 Ce que tu dois faire
+
+Pour ne **jamais perdre tes données** sur web, **installe l'app sur l'écran d'accueil** :
+
+- **iOS Safari** : bouton « Partager » → « Sur l'écran d'accueil »
+- **Android Chrome** : menu ⋮ → « Ajouter à l'écran d'accueil » (ou bandeau d'install qui apparaît automatiquement)
+
+Une fois installée, l'app tourne en mode standalone (sans la barre d'adresse) et ses données sont protégées des nettoyages automatiques du navigateur.
+
+### Multi-appareils
+
+Il n'y a **pas de compte utilisateur ni de cloud auto** — chaque appareil est un silo isolé par défaut. Pour synchroniser tes données entre ton téléphone et le web (ou plusieurs appareils), configure **GitHub Sync** dans `Réglages → Sync GitHub` :
+
+1. Crée un [token GitHub personnel](https://github.com/settings/tokens) (scope `repo`)
+2. Crée un repo **privé vide** (ex: `my-iron-week-data`)
+3. Colle le token + nom du repo (`username/my-iron-week-data`) dans l'app
+4. Tap « Synchroniser » → toutes tes séances vont dans `data.json` sur le repo
+5. Sur l'autre appareil, configure les mêmes credentials et fais Pull
+
+C'est ta sauvegarde cloud, gratuite, privée, et que tu contrôles 100%.
+
+---
+
 ## Fonctionnalités clés
 
 ### 🧠 Coach IA basé sur la formule d'Epley
