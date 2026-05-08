@@ -76,46 +76,6 @@ Sauvegarde de toutes tes séances dans un repo GitHub privé (`data.json`). Expo
 
 ---
 
-## Stack
-
-| Catégorie       | Tech                                                                         |
-| --------------- | ---------------------------------------------------------------------------- |
-| Framework       | React Native + Expo SDK 54                                                   |
-| Langage         | TypeScript                                                                   |
-| State           | Zustand + AsyncStorage (persistance), Expo SecureStore (tokens)              |
-| Navigation      | React Navigation v7 (bottom tabs + stack)                                    |
-| UI              | react-native-svg pour graphiques + bonhomme musculaire, Victory non utilisé  |
-| Sons & Notifs   | expo-av, expo-notifications, expo-haptics                                    |
-| Web             | Build statique Expo + post-build script (script tag → `type="module"`)       |
-| Déploiement     | Vercel (web), EAS (mobile OTA), GitHub                                       |
-
----
-
-## Lancer en local
-
-```bash
-git clone https://github.com/Fumikage-DarkShadow/iron-week-pro.git
-cd iron-week-pro
-npm install
-npx expo start --tunnel
-```
-
-Scanner le QR code avec **Expo Go** (App Store / Play Store).
-
-### Build web
-```bash
-npx expo export --platform web --output-dir dist
-node scripts/post-build.js
-# Servir le dossier dist/ avec n'importe quel static server
-```
-
-### Tests
-```bash
-npx tsc --noEmit  # type check
-```
-
----
-
 ## Architecture
 
 ```
@@ -160,14 +120,8 @@ src/
 >
 > **🐛 Bug** ou **💡 Suggestion** : ouvre une issue sur GitHub → [Iron Week Issues](https://github.com/Fumikage-DarkShadow/iron-week-pro/issues/new)
 >
-> Tu peux aussi me ping directement : [@Fumikage-DarkShadow](https://github.com/Fumikage-DarkShadow) · ilyessadadou@gmail.com
+> Tu peux aussi me ping directement : [@Fumikage-DarkShadow](https://github.com/Fumikage-DarkShadow) 
 >
-> Toute remontée est précieuse pour améliorer l'app — capture d'écran, étapes pour reproduire, ou simplement *« ce serait cool si... »*. Je corrige et je publie l'update OTA dans la foulée.
+> Toute remontée est précieuse pour améliorer l'app (capture d'écran, étapes pour reproduire, ou simplement t'es idées ;)
 
----
 
-<div align="center">
-
-**Made with ❤️ in Paris** · [iron-week-pro.vercel.app](https://iron-week-pro.vercel.app)
-
-</div>
