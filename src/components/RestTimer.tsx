@@ -106,40 +106,55 @@ export default function RestTimer({ duration, onComplete, onSkip, visible, nextS
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, duration]);
 
-  // Tick
+  // Read settings via a ref so the tick effect doesn't re-create the interval
+  // each time the user toggles sound/haptic during a rest. Without this,
+  // toggling mid-rest cleared the interval and re-armed it (skipping ticks
+  // and potentially double-firing beeps).
+  const settingsRef = useRef(settings);
+  useEffect(() => {
+    settingsRef.current = settings;
+  }, [settings]);
+
+  // Tick — pure decrement, no side effects in updater (so React StrictMode
+  // double-invocation doesn't double-beep).
   useEffect(() => {
     if (!isActive) return;
     intervalRef.current = setInterval(() => {
-      setRemaining((prev) => {
-        if (prev <= 0) {
-          if (intervalRef.current) clearInterval(intervalRef.current);
-          return 0;
-        }
-        const next = prev - 1;
-        if (next >= 1 && next <= 5 && settings.soundEnabled) {
-          playBeep();
-        }
-        if (next <= 0) {
-          if (settings.soundEnabled) {
-            playBeep();
-            setTimeout(() => playBeep(), 150);
-            setTimeout(() => playBeep(), 300);
-          }
-          if (settings.hapticEnabled) {
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-          }
-          if (intervalRef.current) clearInterval(intervalRef.current);
-          setIsActive(false);
-          setFinished(true);
-          return 0;
-        }
-        return next;
-      });
+      setRemaining((prev) => Math.max(0, prev - 1));
     }, 1000);
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
     };
-  }, [isActive, settings.soundEnabled, settings.hapticEnabled]);
+  }, [isActive]);
+
+  // Side effects driven by `remaining` — runs exactly once per second change
+  // because `remaining` is the only dep.
+  useEffect(() => {
+    if (!isActive) return;
+    const s = settingsRef.current;
+    // Last 5 seconds: single beep
+    if (remaining >= 1 && remaining <= 5 && s.soundEnabled) {
+      playBeep();
+    }
+    // Reached zero: triple beep + haptic, then mark finished
+    if (remaining <= 0) {
+      if (s.soundEnabled) {
+        playBeep();
+        setTimeout(() => playBeep(), 150);
+        setTimeout(() => playBeep(), 300);
+      }
+      if (s.hapticEnabled) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+      }
+      setIsActive(false);
+      setFinished(true);
+    }
+    // playBeep is stable (uses ref), no need in deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remaining, isActive]);
 
   const playBeep = async () => {
     try {
