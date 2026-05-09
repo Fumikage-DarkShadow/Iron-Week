@@ -12,6 +12,7 @@ import CoachCard from '../../components/CoachCard';
 import { WorkoutSet } from '../../types';
 import type { ExerciseType } from '../../types';
 import { generateWarmupSets } from '../../utils/warmupGenerator';
+import { showAlert } from '../../utils/alert';
 
 export default function ActiveWorkoutScreen({ navigation }: any) {
   const { activeSession, updateSet, updateExercise, completeExercise, addSet, removeSet, addNote, endSession, sessions } = useSessionStore();
@@ -206,7 +207,7 @@ export default function ActiveWorkoutScreen({ navigation }: any) {
   };
 
   const finishWorkout = () => {
-    Alert.alert(
+    showAlert(
       'Terminer la séance ?',
       'Tes résultats seront sauvegardés.',
       [

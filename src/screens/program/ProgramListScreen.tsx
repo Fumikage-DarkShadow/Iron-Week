@@ -3,6 +3,7 @@ import { View, Text, FlatList, TouchableOpacity, TextInput, Modal, StyleSheet, A
 import { colors, fonts, borderRadius, spacing, fontSize } from '../../theme';
 import { useWorkoutStore } from '../../stores/workoutStore';
 import { getExerciseById } from '../../data/exercises';
+import { showAlert } from '../../utils/alert';
 
 export default function ProgramListScreen({ navigation }: any) {
   const { programs, deleteProgram, duplicateProgram, toggleFavorite, updateProgram } = useWorkoutStore();
@@ -15,7 +16,7 @@ export default function ProgramListScreen({ navigation }: any) {
   });
 
   const handleDelete = (id: string, name: string) => {
-    Alert.alert(
+    showAlert(
       'Supprimer le programme',
       `Es-tu sûr de vouloir supprimer "${name}" ? Cette action est irréversible.`,
       [

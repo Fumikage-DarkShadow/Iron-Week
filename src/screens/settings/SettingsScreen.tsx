@@ -8,6 +8,7 @@ import { useSessionStore } from '../../stores/sessionStore';
 import { seedPrograms } from '../../data/seedPrograms';
 import { scheduleWorkoutReminder, cancelAllReminders } from '../../utils/notifications';
 import { shareCSV } from '../../utils/csvExport';
+import { showAlert } from '../../utils/alert';
 
 const goalLabels: Record<UserGoal, string> = {
   masse: 'Prise de masse',
@@ -110,7 +111,7 @@ export default function SettingsScreen({ navigation }: any) {
   };
 
   const confirmReset = (full: boolean) => {
-    Alert.alert(
+    showAlert(
       full ? 'Tout supprimer ?' : 'Réinitialiser les performances ?',
       full
         ? 'Programmes, séances, PRs et planning seront supprimés. Action irréversible.'
