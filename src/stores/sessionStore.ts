@@ -3,6 +3,28 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Session, WorkoutExercise, WorkoutSet, PersonalRecord } from '../types';
 
+// ─── Date helpers (local timezone, ISO week starts Monday) ───
+// Parse a YYYY-MM-DD date string as a LOCAL date at midnight (not UTC).
+// `new Date('2026-05-09')` is parsed as UTC by the spec — that's the bug
+// we're avoiding here.
+function parseLocalDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+}
+
+// Compute Monday 00:00 (local) of the week N weeks ago.
+// JS getDay() returns Sunday=0, Monday=1, ..., Saturday=6.
+// We convert to ISO weekday (Mon=0, ..., Sun=6) so subtraction always
+// gives "this week's Monday", not "next Monday on Sundays".
+function computeStartOfWeek(weeksAgo: number): Date {
+  const now = new Date();
+  const isoDow = (now.getDay() + 6) % 7; // Mon=0 ... Sun=6
+  const start = new Date(now);
+  start.setDate(now.getDate() - isoDow - weeksAgo * 7);
+  start.setHours(0, 0, 0, 0);
+  return start;
+}
+
 interface SessionStore {
   sessions: Session[];
   activeSession: Session | null;
@@ -183,19 +205,29 @@ export const useSessionStore = create<SessionStore>()(
         const { sessions } = get();
         if (sessions.length === 0) return 0;
 
+        // Use LOCAL date strings (YYYY-MM-DD) consistently — session.date is
+        // local-formatted at session start so we must compare local-vs-local
+        // (mixing toISOString with local arithmetic causes off-by-one days
+        // for users east of UTC near midnight).
+        const localDateStr = (d: Date) => {
+          const y = d.getFullYear();
+          const m = String(d.getMonth() + 1).padStart(2, '0');
+          const day = String(d.getDate()).padStart(2, '0');
+          return `${y}-${m}-${day}`;
+        };
+
         const sortedDates = [...new Set(sessions.map((s) => s.date))].sort().reverse();
         let streak = 0;
         const today = new Date();
-        const todayStr = today.toISOString().split('T')[0];
+        const todayStr = localDateStr(today);
 
-        // Allow streak to start from today or yesterday
+        // Allow streak to start from today or yesterday (haven't trained today yet)
         const startOffset = sortedDates[0] === todayStr ? 0 : 1;
 
         for (let i = 0; i < sortedDates.length; i++) {
-          const d = new Date(sortedDates[i]);
           const expected = new Date(today);
           expected.setDate(expected.getDate() - i - startOffset);
-          if (d.toISOString().split('T')[0] === expected.toISOString().split('T')[0]) {
+          if (sortedDates[i] === localDateStr(expected)) {
             streak++;
           } else {
             break;
@@ -206,16 +238,13 @@ export const useSessionStore = create<SessionStore>()(
 
       getWeeklyVolume: (weeksAgo = 0) => {
         const { sessions } = get();
-        const now = new Date();
-        const startOfWeek = new Date(now);
-        startOfWeek.setDate(now.getDate() - now.getDay() - weeksAgo * 7 + 1);
-        startOfWeek.setHours(0, 0, 0, 0);
+        const startOfWeek = computeStartOfWeek(weeksAgo);
         const endOfWeek = new Date(startOfWeek);
         endOfWeek.setDate(startOfWeek.getDate() + 7);
 
         return sessions
           .filter((s) => {
-            const d = new Date(s.date);
+            const d = parseLocalDate(s.date);
             return d >= startOfWeek && d < endOfWeek;
           })
           .reduce((vol, s) => vol + s.totalVolume, 0);
@@ -225,16 +254,13 @@ export const useSessionStore = create<SessionStore>()(
         const { sessions } = get();
         const result: number[] = [];
         for (let i = weeks - 1; i >= 0; i--) {
-          const now = new Date();
-          const startOfWeek = new Date(now);
-          startOfWeek.setDate(now.getDate() - now.getDay() - i * 7 + 1);
-          startOfWeek.setHours(0, 0, 0, 0);
+          const startOfWeek = computeStartOfWeek(i);
           const endOfWeek = new Date(startOfWeek);
           endOfWeek.setDate(startOfWeek.getDate() + 7);
 
           result.push(
             sessions.filter((s) => {
-              const d = new Date(s.date);
+              const d = parseLocalDate(s.date);
               return d >= startOfWeek && d < endOfWeek;
             }).length
           );

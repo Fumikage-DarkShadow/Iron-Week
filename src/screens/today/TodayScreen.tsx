@@ -52,7 +52,13 @@ export default function TodayScreen({ navigation }: any) {
       id: `session_${Date.now()}`,
       programId: todayProgram.id,
       programName: todayProgram.name,
-      date: new Date().toISOString().split('T')[0],
+      date: (() => {
+        const d = new Date();
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      })(),
       dayId: todayDay,
       startedAt: Date.now(),
       totalVolume: 0,
