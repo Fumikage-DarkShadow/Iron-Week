@@ -17,19 +17,13 @@ export default function WorkoutSummaryScreen({ navigation }: any) {
   const lastSession = sessions[sessions.length - 1];
   const shotRef = useRef<ViewShot>(null);
 
-  if (!lastSession) {
-    return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>Aucune séance terminée</Text>
-      </View>
-    );
-  }
-
-  const duration = lastSession.duration ? Math.round(lastSession.duration / 60000) : 0;
-  const totalVolume = lastSession.totalVolume;
+  // ─── ALL HOOKS BELOW MUST RUN ON EVERY RENDER (Rules of Hooks) ───
+  const duration = lastSession?.duration ? Math.round(lastSession.duration / 60000) : 0;
+  const totalVolume = lastSession?.totalVolume ?? 0;
 
   // Count PRs
   const prsCount = useMemo(() => {
+    if (!lastSession) return 0;
     let count = 0;
     const prevSessions = sessions.slice(0, -1);
     for (const ex of lastSession.exercises) {
@@ -51,34 +45,33 @@ export default function WorkoutSummaryScreen({ navigation }: any) {
   }, [lastSession, sessions]);
 
   // Compare with previous session of same program
-  const previousSession = sessions
-    .slice(0, -1)
-    .filter((s) => s.programId === lastSession.programId)
-    .sort((a, b) => b.startedAt - a.startedAt)[0];
+  const previousSession = lastSession
+    ? sessions
+        .slice(0, -1)
+        .filter((s) => s.programId === lastSession.programId)
+        .sort((a, b) => b.startedAt - a.startedAt)[0]
+    : undefined;
 
   const volChange = previousSession && previousSession.totalVolume > 0
     ? Math.round(((totalVolume - previousSession.totalVolume) / previousSession.totalVolume) * 100)
     : 0;
 
-  // 4-week trend (volume avg over last 4 weeks vs preceding 4 weeks)
+  // 4-week trend
   const trend = useMemo(() => {
     const now = Date.now();
     const fourWeeks = 4 * 7 * 24 * 3600 * 1000;
     const recent = sessions.filter((s) => s.startedAt >= now - fourWeeks);
     const older = sessions.filter((s) => s.startedAt < now - fourWeeks && s.startedAt >= now - 2 * fourWeeks);
-
     if (recent.length < 2 || older.length === 0) return null;
-
     const recentAvg = recent.reduce((sum, s) => sum + s.totalVolume, 0) / recent.length;
     const olderAvg = older.reduce((sum, s) => sum + s.totalVolume, 0) / older.length;
     if (olderAvg === 0) return null;
-
-    const change = Math.round(((recentAvg - olderAvg) / olderAvg) * 100);
-    return change;
+    return Math.round(((recentAvg - olderAvg) / olderAvg) * 100);
   }, [sessions]);
 
-  // Best set of the workout (highest 1RM single set)
+  // Best set of the workout
   const bestSet = useMemo(() => {
+    if (!lastSession) return null;
     let best: { exName: string; kg: number; reps: number; oneRm: number } | null = null;
     for (const ex of lastSession.exercises) {
       for (const set of ex.sets) {
@@ -99,6 +92,7 @@ export default function WorkoutSummaryScreen({ navigation }: any) {
 
   // Total reps done
   const totalReps = useMemo(() => {
+    if (!lastSession) return 0;
     return lastSession.exercises.reduce(
       (sum, ex) => sum + ex.sets.filter((s) => s.done).reduce((r, s) => r + s.reps, 0),
       0
@@ -108,9 +102,9 @@ export default function WorkoutSummaryScreen({ navigation }: any) {
   // Muscle map data
   const muscleIntensity = useMemo(() => {
     const map: Partial<Record<MuscleGroup, number>> = {};
+    if (!lastSession) return map;
     let maxVol = 0;
     const volByMuscle: Record<string, number> = {};
-
     for (const ex of lastSession.exercises) {
       const info = getExerciseById(ex.exerciseId);
       if (!info) continue;
@@ -120,7 +114,6 @@ export default function WorkoutSummaryScreen({ navigation }: any) {
         volByMuscle[sec] = (volByMuscle[sec] || 0) + vol * 0.3;
       }
     }
-
     maxVol = Math.max(1, ...Object.values(volByMuscle));
     for (const [muscle, vol] of Object.entries(volByMuscle)) {
       map[muscle as MuscleGroup] = vol / maxVol;
@@ -130,12 +123,13 @@ export default function WorkoutSummaryScreen({ navigation }: any) {
 
   // Recommendations
   const recommendations = useMemo(() => {
+    if (!lastSession) return [];
     return lastSession.exercises.map((ex) =>
       generateRecommendation(ex.exerciseId, sessions, ex.targetRepsRange, settings.goal)
     );
   }, [lastSession, sessions, settings.goal]);
 
-  // Hero phrase based on results
+  // Hero phrase
   const heroPhrase = useMemo(() => {
     if (prsCount >= 3) return `🏆 ${prsCount} RECORDS BATTUS — TU ES EN FEU`;
     if (prsCount > 0) return `🏆 ${prsCount} ${prsCount > 1 ? 'RECORDS BATTUS' : 'RECORD BATTU'} — BRAVO`;
@@ -144,6 +138,15 @@ export default function WorkoutSummaryScreen({ navigation }: any) {
     if (volChange > -10) return `✅ SÉANCE TERMINÉE`;
     return `🌱 SÉANCE LÉGÈRE — RÉCUP IMPORTANTE`;
   }, [prsCount, volChange]);
+
+  // ─── EARLY RETURN (after all hooks) ───
+  if (!lastSession) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>Aucune séance terminée</Text>
+      </View>
+    );
+  }
 
   // Share the summary as image
   const handleShare = async () => {

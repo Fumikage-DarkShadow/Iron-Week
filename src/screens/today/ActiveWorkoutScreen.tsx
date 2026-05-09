@@ -20,48 +20,37 @@ export default function ActiveWorkoutScreen({ navigation }: any) {
   const [currentExIndex, setCurrentExIndex] = useState(0);
   const [showTimer, setShowTimer] = useState(false);
 
-  if (!activeSession) {
-    return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>Aucune séance active</Text>
-      </View>
-    );
-  }
-
-  const totalExercises = activeSession.exercises.length;
-  const currentExercise = activeSession.exercises[currentExIndex];
+  // ─── ALL HOOKS BELOW MUST RUN ON EVERY RENDER (Rules of Hooks) ───
+  // Even when activeSession or currentExercise is missing, hooks still need to be called
+  // in the same order. We compute "safe" values that handle undefined gracefully.
+  const totalExercises = activeSession?.exercises.length ?? 0;
+  const currentExercise = activeSession?.exercises[currentExIndex];
   const exerciseInfo = currentExercise ? getExerciseById(currentExercise.exerciseId) : undefined;
 
-  if (!currentExercise) {
-    return (
-      <View style={styles.emptyContainer}>
-        <Text style={styles.emptyText}>Aucun exercice dans ce programme</Text>
-      </View>
-    );
-  }
-
-  // Superset helpers
-  const supersetGroup = currentExercise.supersetGroup;
-  const supersetExercises = supersetGroup != null
-    ? activeSession.exercises
-        .map((ex, idx) => ({ ex, idx }))
-        .filter((item) => item.ex.supersetGroup === supersetGroup)
-    : [];
+  // Superset helpers (safe with optional chaining)
+  const supersetGroup = currentExercise?.supersetGroup;
+  const supersetExercises = useMemo(() => {
+    if (!activeSession || supersetGroup == null) return [];
+    return activeSession.exercises
+      .map((ex, idx) => ({ ex, idx }))
+      .filter((item) => item.ex.supersetGroup === supersetGroup);
+  }, [activeSession, supersetGroup]);
   const supersetPosition = supersetExercises.findIndex((item) => item.idx === currentExIndex);
   const isInSuperset = supersetExercises.length > 1;
   const isLastInSuperset = isInSuperset && supersetPosition === supersetExercises.length - 1;
 
   // Previous session sets for comparison
   const previousSets = useMemo(() => {
+    if (!currentExercise) return [];
     const prevSessions = sessions
-      .filter((s) => s.exercises.some((e) => e.exerciseId === currentExercise?.exerciseId))
+      .filter((s) => s.exercises.some((e) => e.exerciseId === currentExercise.exerciseId))
       .sort((a, b) => b.startedAt - a.startedAt);
     if (prevSessions.length === 0) return [];
-    const prevEx = prevSessions[0].exercises.find((e) => e.exerciseId === currentExercise?.exerciseId);
+    const prevEx = prevSessions[0].exercises.find((e) => e.exerciseId === currentExercise.exerciseId);
     return prevEx?.sets.filter((s) => s.done) || [];
-  }, [currentExercise?.exerciseId, sessions]);
+  }, [currentExercise, sessions]);
 
-  // Coach recommendation (global, for the exercise)
+  // Coach recommendation
   const recommendation = useMemo(() => {
     if (!currentExercise) return null;
     return generateRecommendation(
@@ -74,10 +63,8 @@ export default function ActiveWorkoutScreen({ navigation }: any) {
 
   // Expert per-set advice
   const getAdviceForSet = useCallback((setIndex: number): string | undefined => {
+    if (!currentExercise) return undefined;
     const doneSets = currentExercise.sets.filter((s) => s.done);
-    const currentSet = currentExercise.sets[setIndex];
-
-    // Only show advice for the NEXT undone set (first undone set)
     const firstUndoneIndex = currentExercise.sets.findIndex((s) => !s.done);
     if (setIndex !== firstUndoneIndex) return undefined;
 
@@ -90,10 +77,11 @@ export default function ActiveWorkoutScreen({ navigation }: any) {
     );
 
     return `${advice.emoji} ${advice.detail}`;
-  }, [currentExercise.sets, currentExercise.targetRepsRange, exerciseInfo?.type]);
+  }, [currentExercise, exerciseInfo?.type]);
 
-  // Timer advice — detailed recommendation for next set
+  // Timer advice
   const getTimerAdvice = useCallback((): string | null => {
+    if (!currentExercise) return null;
     const doneSets = currentExercise.sets.filter((s) => s.done);
     if (doneSets.length === 0) return null;
 
@@ -106,15 +94,15 @@ export default function ActiveWorkoutScreen({ navigation }: any) {
     );
 
     return `${advice.emoji} ${advice.message}\n${advice.detail}`;
-  }, [currentExercise.sets, currentExercise.targetRepsRange, exerciseInfo?.type]);
+  }, [currentExercise, exerciseInfo?.type]);
 
   // Check for PRs
   const checkPR = useCallback((setData: WorkoutSet): boolean => {
-    if (!setData.done || setData.kg === 0) return false;
+    if (!setData.done || setData.kg === 0 || !currentExercise) return false;
     const allPrevSets: { kg: number; reps: number }[] = [];
     sessions.forEach((s) => {
       s.exercises.forEach((e) => {
-        if (e.exerciseId === currentExercise?.exerciseId) {
+        if (e.exerciseId === currentExercise.exerciseId) {
           e.sets.filter((set) => set.done).forEach((set) => allPrevSets.push({ kg: set.kg, reps: set.reps }));
         }
       });
@@ -122,7 +110,24 @@ export default function ActiveWorkoutScreen({ navigation }: any) {
     const current1RM = estimate1RM(setData.kg, setData.reps);
     const best1RM = Math.max(0, ...allPrevSets.map((s) => estimate1RM(s.kg, s.reps)));
     return current1RM > best1RM;
-  }, [currentExercise?.exerciseId, sessions]);
+  }, [currentExercise, sessions]);
+
+  // ─── EARLY RETURNS (after all hooks) ───
+  if (!activeSession) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>Aucune séance active</Text>
+      </View>
+    );
+  }
+
+  if (!currentExercise) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyText}>Aucun exercice dans ce programme</Text>
+      </View>
+    );
+  }
 
   const handleSetDone = (setIndex: number) => {
     const set = currentExercise.sets[setIndex];
