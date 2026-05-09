@@ -245,7 +245,7 @@ export default function ActiveWorkoutScreen({ navigation }: any) {
         </View>
         <View style={styles.progressBar}>
           <View
-            style={[styles.progressFill, { width: `${((currentExIndex + (allSetsDone ? 1 : 0)) / totalExercises) * 100}%` }]}
+            style={[styles.progressFill, { width: totalExercises > 0 ? `${((currentExIndex + (allSetsDone ? 1 : 0)) / totalExercises) * 100}%` : '0%' }]}
           />
         </View>
 

@@ -30,6 +30,7 @@ interface SessionStore {
   activeSession: Session | null;
   startSession: (session: Session) => void;
   endSession: () => void;
+  discardSession: () => void;
   updateExercise: (exerciseIndex: number, updates: Partial<WorkoutExercise>) => void;
   updateSet: (exerciseIndex: number, setIndex: number, updates: Partial<WorkoutSet>) => void;
   addSet: (exerciseIndex: number, set: WorkoutSet) => void;
@@ -156,6 +157,15 @@ export const useSessionStore = create<SessionStore>()(
         let maxVolume = 0;
         let maxReps = 0;
 
+        // Track the LATEST best for each PR type rather than every historical
+        // improvement event — previously this returned a growing list that
+        // bloated memory and the UI ("Tes records" showed the first PR ever
+        // hit, not the current best).
+        let bestWeight: PersonalRecord | null = null;
+        let best1RM: PersonalRecord | null = null;
+        let bestReps: PersonalRecord | null = null;
+        let bestVolume: PersonalRecord | null = null;
+
         for (const session of sessions) {
           for (const ex of session.exercises) {
             if (ex.exerciseId !== exerciseId) continue;
@@ -163,25 +173,35 @@ export const useSessionStore = create<SessionStore>()(
               if (!s.done) continue;
               if (s.kg > maxWeight) {
                 maxWeight = s.kg;
-                prs.push({ exerciseId, type: 'weight', value: s.kg, date: session.date });
+                bestWeight = { exerciseId, type: 'weight', value: s.kg, date: session.date };
               }
               const estimated1RM = s.kg * (1 + s.reps / 30);
               if (estimated1RM > max1RM) {
                 max1RM = estimated1RM;
-                prs.push({ exerciseId, type: '1rm', value: Math.round(estimated1RM * 10) / 10, date: session.date });
+                best1RM = {
+                  exerciseId,
+                  type: '1rm',
+                  value: Math.round(estimated1RM * 10) / 10,
+                  date: session.date,
+                };
               }
               if (s.reps > maxReps) {
                 maxReps = s.reps;
-                prs.push({ exerciseId, type: 'reps', value: s.reps, date: session.date });
+                bestReps = { exerciseId, type: 'reps', value: s.reps, date: session.date };
               }
             }
             const vol = ex.sets.filter((s) => s.done).reduce((v, s) => v + s.kg * s.reps, 0);
             if (vol > maxVolume) {
               maxVolume = vol;
-              prs.push({ exerciseId, type: 'volume', value: vol, date: session.date });
+              bestVolume = { exerciseId, type: 'volume', value: vol, date: session.date };
             }
           }
         }
+
+        if (bestWeight) prs.push(bestWeight);
+        if (best1RM) prs.push(best1RM);
+        if (bestReps) prs.push(bestReps);
+        if (bestVolume) prs.push(bestVolume);
         return prs;
       },
 
@@ -268,6 +288,11 @@ export const useSessionStore = create<SessionStore>()(
         return result;
       },
       resetAllData: () => set({ sessions: [], activeSession: null }),
+
+      // Discard the active session WITHOUT persisting it. Used by the
+      // "Annuler" button on the Today screen so cancelling a started
+      // session doesn't add a junk completed entry to history.
+      discardSession: () => set({ activeSession: null }),
     }),
     {
       name: 'iron-week-sessions',

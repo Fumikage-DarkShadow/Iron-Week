@@ -134,7 +134,8 @@ export function generateRecommendation(
     });
     const bestAvg = bestSession.sets.reduce((sum, s) => sum + s.reps, 0) / (bestSession.sets.length || 1);
     const currentAvg = currentReps.reduce((sum, r) => sum + r, 0) / (currentReps.length || 1);
-    const dropPercent = ((bestAvg - currentAvg) / bestAvg) * 100;
+    // Guard against bestAvg=0 (would yield -Infinity → NaN downstream)
+    const dropPercent = bestAvg > 0 ? ((bestAvg - currentAvg) / bestAvg) * 100 : 0;
 
     if (dropPercent > 20) {
       const isCompound = exercise.type === 'compound';

@@ -151,7 +151,8 @@ export default function TodayScreen({ navigation }: any) {
             style={styles.activeSessionCancelBtn}
             onPress={(e) => {
               e.stopPropagation();
-              useSessionStore.getState().endSession();
+              // Discard (not save) — cancelling shouldn't create a junk session
+              useSessionStore.getState().discardSession();
             }}
           >
             <Text style={styles.activeSessionCancelText}>Annuler</Text>
