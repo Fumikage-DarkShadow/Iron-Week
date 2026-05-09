@@ -80,7 +80,9 @@ export function getSetAdvice(
   if (belowMin) {
     const repsShort = minReps - lastReps;
     const intensity = repsShort >= 3 ? 'Trop lourd' : 'Un peu juste';
-    const newKg = diff < 0 ? smartKg : Math.max(lastKg - (isCompound ? 2.5 : 1), 0);
+    // Lower bound at the smallest plate increment, never 0kg (degenerate suggestion)
+    const minIncrement = isCompound ? 2.5 : 1;
+    const newKg = diff < 0 ? smartKg : Math.max(lastKg - minIncrement, minIncrement);
     const drop = lastKg - newKg;
     return {
       suggestedKg: newKg,

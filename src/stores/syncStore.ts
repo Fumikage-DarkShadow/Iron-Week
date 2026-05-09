@@ -33,14 +33,29 @@ export const useSyncStore = create<SyncStore>((set, get) => ({
     try {
       const data = await pullData();
       if (data) {
-        // Merge pulled data with local (simple: remote wins for now)
-        if (data.sessions) {
-          // We'd merge sessions here in a real app
+        // Last-write-wins merge: remote replaces local for the keys it carries.
+        // Previously this was a silent no-op while reporting "success" — pulled
+        // data was discarded.
+        if (Array.isArray(data.sessions)) {
+          useSessionStore.setState({ sessions: data.sessions });
+        }
+        if (Array.isArray(data.programs)) {
+          useWorkoutStore.setState({ programs: data.programs });
+        }
+        if (data.weeklyPlan && typeof data.weeklyPlan === 'object') {
+          useWorkoutStore.setState({ weeklyPlan: data.weeklyPlan });
+        }
+        if (data.settings && typeof data.settings === 'object') {
+          // Merge settings rather than replace, so local-only flags
+          // (hasOnboarded) survive the pull.
+          useSettingsStore.setState((state) => ({
+            settings: { ...state.settings, ...data.settings },
+          }));
         }
       }
       set({ status: 'success', lastSyncAt: Date.now(), error: null });
     } catch (e: any) {
-      set({ status: 'error', error: e.message });
+      set({ status: 'error', error: e?.message || 'Sync failed' });
     }
   },
 
